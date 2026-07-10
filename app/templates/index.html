@@ -51,6 +51,9 @@
     .scroll { max-height: 560px; overflow: auto; border: 1px solid #d8dee9; border-radius: 8px; }
     .status { display: flex; gap: 8px; flex-wrap: wrap; }
     .pill { display: inline-block; background: #eef4f8; border: 1px solid #d8dee9; border-radius: 999px; padding: 5px 9px; font-size: 12px; }
+    .class-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .class-tabs button { background: #eef4f8; color: #12355b; border: 1px solid #cbd6e2; }
+    .class-tabs button:hover { background: #12355b; color: white; }
     .chart { display: grid; gap: 10px; }
     .chart-row { display: grid; grid-template-columns: 76px 1fr 92px; gap: 10px; align-items: center; font-size: 12px; }
     .bar-track { height: 12px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
@@ -258,14 +261,28 @@
     </section>
 
     <section id="classificacao" class="tab">
+      <div class="panel">
+        <h2>Atalhos de classificacao</h2>
+        <div class="class-tabs">
+          <button type="button" data-group="Receitas" data-dre="Receita Bruta" data-cashflow="Operacional">Receitas</button>
+          <button type="button" data-group="Custos e Compras" data-dre="Custos e Compras" data-cashflow="Operacional">Compras</button>
+          <button type="button" data-group="Despesas Fixas" data-dre="Despesas Fixas" data-cashflow="Operacional">Despesas Fixas</button>
+          <button type="button" data-group="Pessoal" data-dre="Despesas com Pessoal" data-cashflow="Operacional">Pessoal</button>
+          <button type="button" data-group="Financeiro" data-dre="Resultado Financeiro" data-cashflow="Financiamento">Financeiro</button>
+          <button type="button" data-group="Transferencias" data-dre="Transferencias" data-cashflow="Transferencia">Transferencias</button>
+          <button type="button" data-group="Caixa e Bancos" data-dre="Disponibilidades" data-cashflow="Operacional">Caixa/Bancos</button>
+          <button type="button" data-group="Outras" data-dre="Outras Receitas/Despesas" data-cashflow="Operacional">Outras</button>
+        </div>
+        <p class="muted">Clique em uma opcao antes de salvar uma nova conta financeira. O sistema preenche Grupo, Linha DRE e Classe de Fluxo automaticamente.</p>
+      </div>
       <div class="two">
         <div class="panel">
           <h2>Nova conta financeira</h2>
           <form action="/accounts" method="post">
             <input name="name" placeholder="Conta financeira" required>
-            <input name="group_name" placeholder="Grupo" value="Outras">
-            <input name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
-            <input name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
+            <input id="account-group" name="group_name" placeholder="Grupo" value="Outras">
+            <input id="account-dre" name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
+            <input id="account-cashflow" name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
             <button type="submit">Salvar</button>
           </form>
         </div>
@@ -425,5 +442,14 @@
       </div>
     </section>
   </main>
+  <script>
+    document.querySelectorAll(".class-tabs button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.getElementById("account-group").value = button.dataset.group;
+        document.getElementById("account-dre").value = button.dataset.dre;
+        document.getElementById("account-cashflow").value = button.dataset.cashflow;
+      });
+    });
+  </script>
 </body>
 </html>
