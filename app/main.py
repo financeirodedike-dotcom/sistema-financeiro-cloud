@@ -368,7 +368,7 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
 @app.post("/debts")
 def create_debt(
     request: Request,
-    debt_date: date | None = Form(None),
+    debt_date: str = Form(""),
     creditor: str = Form(...),
     creditor_type: str = Form("Banco"),
     description: str = Form(""),
@@ -387,7 +387,7 @@ def create_debt(
     db.add(
         Debt(
             company_id=company.id,
-            debt_date=debt_date,
+            debt_date=parse_filter_date(debt_date),
             creditor=creditor.strip(),
             creditor_type=creditor_type,
             description=description.strip(),
@@ -407,7 +407,7 @@ def create_debt(
 def update_debt(
     request: Request,
     debt_id: int,
-    debt_date: date | None = Form(None),
+    debt_date: str = Form(""),
     creditor: str = Form(...),
     creditor_type: str = Form("Banco"),
     description: str = Form(""),
@@ -426,7 +426,7 @@ def update_debt(
     _user, company = context
     debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
     if debt:
-        debt.debt_date = debt_date
+        debt.debt_date = parse_filter_date(debt_date)
         debt.creditor = creditor.strip()
         debt.creditor_type = creditor_type
         debt.description = description.strip()
