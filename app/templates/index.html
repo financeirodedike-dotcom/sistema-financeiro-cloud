@@ -17,6 +17,7 @@
     input[name="tab"] { display: none; }
     .tab { display: none; }
     #tab-dashboard:checked ~ .tabs label[for="tab-dashboard"],
+    #tab-financeiro:checked ~ .tabs label[for="tab-financeiro"],
     #tab-extratos:checked ~ .tabs label[for="tab-extratos"],
     #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
     #tab-compras:checked ~ .tabs label[for="tab-compras"],
@@ -27,6 +28,7 @@
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
     #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: #12355b; color: white; }
     #tab-dashboard:checked ~ main #dashboard,
+    #tab-financeiro:checked ~ main #financeiro,
     #tab-extratos:checked ~ main #extratos,
     #tab-classificacao:checked ~ main #classificacao,
     #tab-compras:checked ~ main #compras,
@@ -64,6 +66,8 @@
     .hero360 h2 { color: #4cc9f0; }
     .pillar-grid, .module-grid, .roadmap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
     .pillar, .module-card, .roadmap-card { border: 1px solid #cbd6e2; border-radius: 8px; padding: 12px; background: white; }
+    a.module-card { display: block; color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+    a.module-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(18,53,91,.12); }
     .hero360 .pillar, .hero360 .module-card { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
     .module-card strong, .pillar strong { display: block; color: #12355b; margin-bottom: 6px; }
     .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
@@ -108,6 +112,7 @@
   </header>
 
   <input id="tab-dashboard" name="tab" type="radio" {% if active_tab == "dashboard" %}checked{% endif %}>
+  <input id="tab-financeiro" name="tab" type="radio" {% if active_tab == "financeiro" %}checked{% endif %}>
   <input id="tab-extratos" name="tab" type="radio" {% if active_tab == "extratos" %}checked{% endif %}>
   <input id="tab-classificacao" name="tab" type="radio" {% if active_tab == "classificacao" %}checked{% endif %}>
   <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
@@ -120,13 +125,9 @@
 
   <nav class="tabs">
     <label for="tab-dashboard">Centro de Controle</label>
-    <label for="tab-extratos">Extratos</label>
-    <label for="tab-classificacao">Classificacao</label>
+    <label for="tab-financeiro">Financeiro</label>
     <label for="tab-compras">Compras</label>
-    <label for="tab-fluxo">Fluxo de Caixa</label>
-    <label for="tab-dre">DRE</label>
     <label for="tab-balanco">Balanco</label>
-    <label for="tab-endividamento">Endividamento</label>
     <label for="tab-mapa">Mapa Empresarial 360</label>
     <label for="tab-acessos">Acessos e Usuarios</label>
   </nav>
@@ -213,7 +214,74 @@
       </div>
     </section>
 
+    <section id="financeiro" class="tab">
+      <div class="panel hero360">
+        <h2>Modulo Financeiro</h2>
+        <p>Central financeira do Business360 AI para importar extratos, classificar contas, acompanhar fluxo de caixa, DRE e controlar endividamento.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Receitas</strong><span>R$ {{ "%.2f"|format(dashboard.receitas) }}</span></div>
+          <div class="pillar"><strong>Despesas</strong><span>R$ {{ "%.2f"|format(dashboard.despesas) }}</span></div>
+          <div class="pillar"><strong>Resultado</strong><span>R$ {{ "%.2f"|format(dashboard.resultado) }}</span></div>
+          <div class="pillar"><strong>A classificar</strong><span>{{ dashboard.pendentes }} lancamentos</span></div>
+          <div class="pillar"><strong>Dividas</strong><span>R$ {{ "%.2f"|format(balance.debt_total) }}</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Areas do financeiro</h2>
+        <div class="module-grid">
+          <a class="module-card" href="/?tab=extratos">
+            <strong>Extratos</strong>
+            <span>Importe OFX, filtre por data, escolha banco/caixa e consulte o banco de dados de lancamentos.</span>
+          </a>
+          <a class="module-card" href="/?tab=classificacao">
+            <strong>Classificacao</strong>
+            <span>Cadastre o plano de contas, grupos, linhas da DRE e regras automaticas por palavra-chave.</span>
+          </a>
+          <a class="module-card" href="/?tab=fluxo">
+            <strong>Fluxo de Caixa</strong>
+            <span>Acompanhe entradas, saidas, saldo do mes e saldo acumulado por competencia.</span>
+          </a>
+          <a class="module-card" href="/?tab=dre">
+            <strong>DRE</strong>
+            <span>Veja o resultado gerencial por linha financeira e identifique onde o lucro esta sendo formado.</span>
+          </a>
+          <a class="module-card" href="/?tab=endividamento">
+            <strong>Endividamento</strong>
+            <span>Controle dividas, juros simples ou compostos, vencimentos, dias em atraso e evolucao mensal.</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Rotina recomendada</h2>
+          <table>
+            <tbody>
+              <tr><td>1. Importar extratos</td><td>Trazer OFX dos bancos e Caixa Interno.</td></tr>
+              <tr><td>2. Classificar</td><td>Resolver pendencias e criar regras automaticas.</td></tr>
+              <tr><td>3. Conferir fluxo</td><td>Validar caixa mensal e acumulado.</td></tr>
+              <tr><td>4. Analisar DRE</td><td>Entender lucro, custos e despesas.</td></tr>
+              <tr><td>5. Revisar dividas</td><td>Atualizar vencimentos, juros e atrasos.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Alertas financeiros</h2>
+          <table>
+            <tbody>
+              <tr><td>Lancamentos sem classificacao</td><td class="{{ 'negative' if dashboard.pendentes > 0 else 'positive' }}">{{ dashboard.pendentes }}</td></tr>
+              <tr><td>Resultado atual</td><td class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</td></tr>
+              <tr><td>Endividamento cadastrado</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
+              <tr><td>Compras classificadas</td><td>R$ {{ "%.2f"|format(purchases.total) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="extratos" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="two">
         <div class="panel">
           <h2>Importar OFX</h2>
@@ -301,6 +369,7 @@
     </section>
 
     <section id="classificacao" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
         <h2>Atalhos de classificacao</h2>
         <div class="class-tabs">
@@ -371,6 +440,7 @@
     </section>
 
     <section id="fluxo" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
         <h2>Fluxo de Caixa</h2>
         <table>
@@ -391,6 +461,7 @@
     </section>
 
     <section id="dre" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
         <h2>DRE Gerencial</h2>
         <table>
@@ -428,6 +499,7 @@
     </section>
 
     <section id="endividamento" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
