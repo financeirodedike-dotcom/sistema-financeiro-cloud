@@ -92,6 +92,16 @@ def require_context(request: Request, db: Session) -> tuple[User, Company] | Red
     return user, company
 
 
+def current_membership(user: User, company: Company, db: Session) -> Membership | None:
+    return db.scalar(
+        select(Membership).where(Membership.user_id == user.id, Membership.company_id == company.id).limit(1)
+    )
+
+
+def can_manage_access(membership: Membership | None) -> bool:
+    return bool(membership and membership.role in {"owner", "admin"})
+
+
 @app.on_event("startup")
 def startup():
     init_db()
@@ -186,6 +196,11 @@ def home(request: Request, db: Session = Depends(get_db)):
     imports = db.scalars(
         select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
     ).all()
+    user_memberships = db.scalars(
+        select(Membership).where(Membership.company_id == company.id).order_by(Membership.created_at.desc())
+    ).all()
+    active_users = sum(1 for membership in user_memberships if membership.user.is_active)
+    current_user_membership = current_membership(user, company, db)
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
     debt_rows = [{"debt": debt, "overdue_days": debt_overdue_days(debt)} for debt in debts]
     purchases_report = purchases(db, company.id)
@@ -211,6 +226,15 @@ def home(request: Request, db: Session = Depends(get_db)):
             "rules": rules,
             "transactions": transactions,
             "imports": imports,
+            "user_memberships": user_memberships,
+            "access_summary": {
+                "total": len(user_memberships),
+                "active": active_users,
+                "inactive": len(user_memberships) - active_users,
+                "admins": sum(1 for membership in user_memberships if membership.role in {"owner", "admin"}),
+            },
+            "current_membership": current_user_membership,
+            "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
             "debt_rows": debt_rows,
             "debt_report": debt_evolution(selected_debt, report_months),
@@ -353,6 +377,74 @@ def create_account(
         )
     db.commit()
     return RedirectResponse("/", status_code=303)
+
+
+@app.post("/access/users")
+def create_access_user(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("consulta"),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    user, company = context
+    if not can_manage_access(current_membership(user, company, db)):
+        return RedirectResponse("/?tab=acessos", status_code=303)
+    clean_email = email.strip().lower()
+    allowed_roles = {"owner", "admin", "financeiro", "operacao", "consulta"}
+    selected_role = role if role in allowed_roles else "consulta"
+    invited_user = db.scalar(select(User).where(User.email == clean_email))
+    if invited_user:
+        invited_user.name = name.strip() or invited_user.name
+        invited_user.is_active = True
+        if password.strip():
+            invited_user.password_hash = hash_password(password)
+    else:
+        invited_user = User(name=name.strip(), email=clean_email, password_hash=hash_password(password), is_active=True)
+        db.add(invited_user)
+        db.flush()
+    membership = db.scalar(
+        select(Membership).where(Membership.user_id == invited_user.id, Membership.company_id == company.id)
+    )
+    if membership:
+        membership.role = selected_role
+    else:
+        db.add(Membership(user_id=invited_user.id, company_id=company.id, role=selected_role))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+    return RedirectResponse("/?tab=acessos", status_code=303)
+
+
+@app.post("/access/users/{membership_id}/update")
+def update_access_user(
+    request: Request,
+    membership_id: int,
+    name: str = Form(...),
+    role: str = Form("consulta"),
+    is_active: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    user, company = context
+    if not can_manage_access(current_membership(user, company, db)):
+        return RedirectResponse("/?tab=acessos", status_code=303)
+    membership = db.scalar(select(Membership).where(Membership.company_id == company.id, Membership.id == membership_id))
+    allowed_roles = {"owner", "admin", "financeiro", "operacao", "consulta"}
+    if membership:
+        membership.user.name = name.strip() or membership.user.name
+        membership.role = role if role in allowed_roles else membership.role
+        if membership.user_id != user.id:
+            membership.user.is_active = is_active == "on"
+        db.commit()
+    return RedirectResponse("/?tab=acessos", status_code=303)
 
 
 @app.post("/rules")

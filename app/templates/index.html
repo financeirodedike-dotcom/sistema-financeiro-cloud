@@ -24,7 +24,8 @@
     #tab-dre:checked ~ .tabs label[for="tab-dre"],
     #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
     #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"],
-    #tab-mapa:checked ~ .tabs label[for="tab-mapa"] { background: #12355b; color: white; }
+    #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
+    #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: #12355b; color: white; }
     #tab-dashboard:checked ~ main #dashboard,
     #tab-extratos:checked ~ main #extratos,
     #tab-classificacao:checked ~ main #classificacao,
@@ -33,7 +34,8 @@
     #tab-dre:checked ~ main #dre,
     #tab-balanco:checked ~ main #balanco,
     #tab-endividamento:checked ~ main #endividamento,
-    #tab-mapa:checked ~ main #mapa { display: grid; gap: 16px; }
+    #tab-mapa:checked ~ main #mapa,
+    #tab-acessos:checked ~ main #acessos { display: grid; gap: 16px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .three { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -82,6 +84,9 @@
     .debt-edit { margin-top: 8px; }
     .debt-edit summary { display: inline-block; padding: 7px 10px; border-radius: 6px; background: #12355b; color: white; font-weight: 700; cursor: pointer; }
     .debt-edit form { margin-top: 8px; padding: 10px; background: #f8fbff; border: 1px solid #d8dee9; border-radius: 8px; }
+    .role-badge { display: inline-block; border-radius: 999px; padding: 5px 9px; background: #e8f3ff; color: #12355b; font-weight: 700; font-size: 12px; }
+    .danger { background: #c1121f; }
+    .inline-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #667085; }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
       .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid { grid-template-columns: 1fr; }
@@ -111,6 +116,7 @@
   <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
   <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
   <input id="tab-mapa" name="tab" type="radio" {% if active_tab == "mapa" %}checked{% endif %}>
+  <input id="tab-acessos" name="tab" type="radio" {% if active_tab == "acessos" %}checked{% endif %}>
 
   <nav class="tabs">
     <label for="tab-dashboard">Centro de Controle</label>
@@ -122,6 +128,7 @@
     <label for="tab-balanco">Balanco</label>
     <label for="tab-endividamento">Endividamento</label>
     <label for="tab-mapa">Mapa Empresarial 360</label>
+    <label for="tab-acessos">Acessos e Usuarios</label>
   </nav>
 
   <main>
@@ -537,6 +544,97 @@
         {% else %}
         <p class="muted">Escolha uma divida para ver a evolucao mensal com juros simples ou compostos.</p>
         {% endif %}
+      </div>
+    </section>
+
+    <section id="acessos" class="tab">
+      <div class="panel hero360">
+        <h2>Gerenciamento de Acessos e Usuarios</h2>
+        <p>Controle quem entra no Business360 AI, qual perfil cada pessoa tem e se o acesso esta ativo. Essa area e a base para permissoes por modulo nas proximas etapas.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Total</strong><span>{{ access_summary.total }} usuarios vinculados.</span></div>
+          <div class="pillar"><strong>Ativos</strong><span>{{ access_summary.active }} acessos liberados.</span></div>
+          <div class="pillar"><strong>Inativos</strong><span>{{ access_summary.inactive }} acessos bloqueados.</span></div>
+          <div class="pillar"><strong>Admins</strong><span>{{ access_summary.admins }} gestores do sistema.</span></div>
+          <div class="pillar"><strong>Meu perfil</strong><span>{{ current_membership.role if current_membership else "sem perfil" }}</span></div>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Novo usuario</h2>
+          {% if can_manage_access %}
+          <form action="/access/users" method="post">
+            <input name="name" placeholder="Nome do usuario" required>
+            <input name="email" type="email" placeholder="E-mail de acesso" required>
+            <input name="password" type="password" placeholder="Senha inicial" required minlength="6">
+            <select name="role">
+              <option value="consulta">Consulta</option>
+              <option value="financeiro">Financeiro</option>
+              <option value="operacao">Operacao</option>
+              <option value="admin">Administrador</option>
+              <option value="owner">Dono</option>
+            </select>
+            <button type="submit">Criar acesso</button>
+          </form>
+          <p class="muted">Se o e-mail ja existir, o sistema vincula o usuario a esta empresa e atualiza o perfil informado.</p>
+          {% else %}
+          <p class="muted">Seu perfil atual nao permite criar usuarios. Peça para um owner ou administrador liberar esse acesso.</p>
+          {% endif %}
+        </div>
+        <div class="panel">
+          <h2>Perfis de acesso</h2>
+          <table>
+            <tbody>
+              <tr><td><span class="role-badge">owner</span></td><td>Dono da empresa, acesso total e gestao de usuarios.</td></tr>
+              <tr><td><span class="role-badge">admin</span></td><td>Administra usuarios e configuracoes principais.</td></tr>
+              <tr><td><span class="role-badge">financeiro</span></td><td>Opera extratos, classificacao, DRE, fluxo e endividamento.</td></tr>
+              <tr><td><span class="role-badge">operacao</span></td><td>Acompanha compras, producao, estoque e rotinas operacionais.</td></tr>
+              <tr><td><span class="role-badge">consulta</span></td><td>Visualiza relatorios e indicadores sem alterar estrutura.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Usuarios da empresa</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Usuario</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Criado em</th><th>Editar</th></tr></thead>
+            <tbody>
+              {% for membership in user_memberships %}
+              <tr>
+                <td>{{ membership.user.name }}</td>
+                <td>{{ membership.user.email }}</td>
+                <td><span class="role-badge">{{ membership.role }}</span></td>
+                <td class="{{ 'positive' if membership.user.is_active else 'negative' }}">{{ "Ativo" if membership.user.is_active else "Inativo" }}</td>
+                <td>{{ membership.created_at.date() }}</td>
+                <td>
+                  {% if can_manage_access %}
+                  <form action="/access/users/{{ membership.id }}/update" method="post">
+                    <input name="name" value="{{ membership.user.name }}" required>
+                    <select name="role">
+                      <option value="consulta" {% if membership.role == "consulta" %}selected{% endif %}>Consulta</option>
+                      <option value="financeiro" {% if membership.role == "financeiro" %}selected{% endif %}>Financeiro</option>
+                      <option value="operacao" {% if membership.role == "operacao" %}selected{% endif %}>Operacao</option>
+                      <option value="admin" {% if membership.role == "admin" %}selected{% endif %}>Administrador</option>
+                      <option value="owner" {% if membership.role == "owner" %}selected{% endif %}>Dono</option>
+                    </select>
+                    <label class="inline-check">
+                      <input name="is_active" type="checkbox" {% if membership.user.is_active %}checked{% endif %} {% if membership.user_id == user.id %}disabled{% endif %}>
+                      Ativo
+                    </label>
+                    <button type="submit">Salvar</button>
+                  </form>
+                  {% else %}
+                  <span class="muted">Somente administradores</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
