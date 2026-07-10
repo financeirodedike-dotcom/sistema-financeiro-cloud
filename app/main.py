@@ -20,6 +20,17 @@ app = FastAPI(title="Business360 AI")
 templates = Jinja2Templates(directory="app/templates")
 
 
+def format_brl(value: float | int | None) -> str:
+    amount = float(value or 0)
+    formatted = f"{abs(amount):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if amount < 0:
+        return f"-R$ {formatted}"
+    return f"R$ {formatted}"
+
+
+templates.env.filters["brl"] = format_brl
+
+
 DEFAULT_ACCOUNTS = [
     ("A classificar", "Outras", "Outras Receitas/Despesas", "Operacional"),
     ("Venda a vista", "Receitas", "Receita Bruta", "Operacional"),
@@ -216,6 +227,13 @@ def home(request: Request, db: Session = Depends(get_db)):
             selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
         except ValueError:
             selected_debt = None
+    cashflow_report = monthly_cashflow(db, company.id)
+    cashflow_totals = {
+        "entradas": sum(row["entradas"] for row in cashflow_report),
+        "saidas": sum(row["saidas"] for row in cashflow_report),
+        "saldo_periodo": sum(row["saldo_mes"] for row in cashflow_report),
+        "saldo_acumulado": cashflow_report[-1]["saldo_acumulado"] if cashflow_report else 0,
+    }
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -248,7 +266,8 @@ def home(request: Request, db: Session = Depends(get_db)):
             },
             "active_tab": request.query_params.get("tab", "dashboard"),
             "dashboard": dashboard(db, company.id),
-            "cashflow": monthly_cashflow(db, company.id),
+            "cashflow": cashflow_report,
+            "cashflow_totals": cashflow_totals,
             "dre": dre(db, company.id),
             "balance": balance_sheet(db, company.id),
             "purchases": purchases_report,

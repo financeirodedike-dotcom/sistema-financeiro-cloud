@@ -48,6 +48,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th { background: #12355b; color: white; text-align: left; }
     th, td { padding: 8px; border-bottom: 1px solid #d8dee9; vertical-align: middle; }
+    tfoot td { background: #eef4f8; font-weight: 800; }
     tr:nth-child(even) { background: #f8fbff; }
     input, select, button { padding: 9px 10px; border: 1px solid #d8dee9; border-radius: 6px; }
     button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
@@ -443,19 +444,35 @@
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
         <h2>Fluxo de Caixa</h2>
+        <div class="grid">
+          <div class="kpi"><span>Total de entradas</span><strong>{{ cashflow_totals.entradas|brl }}</strong></div>
+          <div class="kpi"><span>Total de saidas</span><strong>{{ cashflow_totals.saidas|brl }}</strong></div>
+          <div class="kpi"><span>Saldo do periodo</span><strong class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</strong></div>
+          <div class="kpi"><span>Saldo acumulado</span><strong class="{{ 'negative' if cashflow_totals.saldo_acumulado < 0 else 'positive' }}">{{ cashflow_totals.saldo_acumulado|brl }}</strong></div>
+        </div>
+        <p class="muted">Valores em padrao financeiro brasileiro: R$ 1.234,56.</p>
         <table>
           <thead><tr><th>Mes</th><th>Entradas</th><th>Saidas</th><th>Saldo mes</th><th>Saldo acumulado</th></tr></thead>
           <tbody>
             {% for row in cashflow %}
             <tr>
               <td>{{ row.month }}</td>
-              <td>R$ {{ "%.2f"|format(row.entradas) }}</td>
-              <td>R$ {{ "%.2f"|format(row.saidas) }}</td>
-              <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.saldo_mes) }}</td>
-              <td class="{{ 'negative' if row.saldo_acumulado < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.saldo_acumulado) }}</td>
+              <td>{{ row.entradas|brl }}</td>
+              <td>{{ row.saidas|brl }}</td>
+              <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">{{ row.saldo_mes|brl }}</td>
+              <td class="{{ 'negative' if row.saldo_acumulado < 0 else 'positive' }}">{{ row.saldo_acumulado|brl }}</td>
             </tr>
             {% endfor %}
           </tbody>
+          <tfoot>
+            <tr>
+              <td>Total do periodo</td>
+              <td>{{ cashflow_totals.entradas|brl }}</td>
+              <td>{{ cashflow_totals.saidas|brl }}</td>
+              <td class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</td>
+              <td class="{{ 'negative' if cashflow_totals.saldo_acumulado < 0 else 'positive' }}">{{ cashflow_totals.saldo_acumulado|brl }}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </section>
