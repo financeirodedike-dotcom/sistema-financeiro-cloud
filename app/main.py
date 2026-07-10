@@ -13,7 +13,7 @@ from app.classifier import classify_account
 from app.database import get_db, init_db
 from app.models import ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import balance_sheet, dashboard, dashboard_charts, dre, monthly_cashflow, purchases
+from app.reports import balance_sheet, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, purchases
 
 
 app = FastAPI(title="Sistema Financeiro")
@@ -182,6 +182,18 @@ def home(request: Request, db: Session = Depends(get_db)):
     ).all()
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
     purchases_report = purchases(db, company.id)
+    report_debt_id = request.query_params.get("debt_report")
+    report_months_raw = request.query_params.get("debt_months", "12")
+    try:
+        report_months = int(report_months_raw)
+    except ValueError:
+        report_months = 12
+    selected_debt = None
+    if report_debt_id:
+        try:
+            selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
+        except ValueError:
+            selected_debt = None
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -193,6 +205,8 @@ def home(request: Request, db: Session = Depends(get_db)):
             "transactions": transactions,
             "imports": imports,
             "debts": debts,
+            "debt_report": debt_evolution(selected_debt, report_months),
+            "debt_report_months": report_months,
             "bank_sources": BANK_SOURCES,
             "bank_options": bank_options,
             "filters": {
@@ -354,10 +368,13 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
 @app.post("/debts")
 def create_debt(
     request: Request,
+    debt_date: date | None = Form(None),
     creditor: str = Form(...),
+    creditor_type: str = Form("Banco"),
     description: str = Form(""),
     capital_value: float = Form(0),
     monthly_interest_rate: float = Form(0),
+    interest_type: str = Form("Compostos"),
     installment_value: float = Form(0),
     due_day: int = Form(1),
     notes: str = Form(""),
@@ -370,10 +387,13 @@ def create_debt(
     db.add(
         Debt(
             company_id=company.id,
+            debt_date=debt_date,
             creditor=creditor.strip(),
+            creditor_type=creditor_type,
             description=description.strip(),
             capital_value=capital_value,
             monthly_interest_rate=monthly_interest_rate,
+            interest_type=interest_type,
             installment_value=installment_value,
             due_day=due_day,
             notes=notes.strip(),
@@ -387,10 +407,13 @@ def create_debt(
 def update_debt(
     request: Request,
     debt_id: int,
+    debt_date: date | None = Form(None),
     creditor: str = Form(...),
+    creditor_type: str = Form("Banco"),
     description: str = Form(""),
     capital_value: float = Form(0),
     monthly_interest_rate: float = Form(0),
+    interest_type: str = Form("Compostos"),
     installment_value: float = Form(0),
     due_day: int = Form(1),
     status: str = Form("Ativo"),
@@ -403,10 +426,13 @@ def update_debt(
     _user, company = context
     debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
     if debt:
+        debt.debt_date = debt_date
         debt.creditor = creditor.strip()
+        debt.creditor_type = creditor_type
         debt.description = description.strip()
         debt.capital_value = capital_value
         debt.monthly_interest_rate = monthly_interest_rate
+        debt.interest_type = interest_type
         debt.installment_value = installment_value
         debt.due_day = due_day
         debt.status = status

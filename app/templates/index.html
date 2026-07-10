@@ -391,10 +391,22 @@
       <div class="panel">
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
+          <input name="debt_date" type="date" title="Data da divida">
           <input name="creditor" placeholder="Credor" required>
+          <select name="creditor_type">
+            <option value="Banco">Banco</option>
+            <option value="Fornecedor">Fornecedor</option>
+            <option value="Pessoa Fisica">Pessoa Fisica</option>
+            <option value="Governo/Impostos">Governo/Impostos</option>
+            <option value="Outro">Outro</option>
+          </select>
           <input name="description" placeholder="Descricao">
           <input name="capital_value" type="number" step="0.01" placeholder="Capital">
           <input name="monthly_interest_rate" type="number" step="0.01" placeholder="Juros mensal %">
+          <select name="interest_type">
+            <option value="Compostos">Juros compostos</option>
+            <option value="Simples">Juros simples</option>
+          </select>
           <input name="installment_value" type="number" step="0.01" placeholder="Parcela mensal">
           <input name="due_day" type="number" min="1" max="31" placeholder="Dia venc.">
           <input name="notes" placeholder="Observacoes">
@@ -404,25 +416,40 @@
       <div class="panel">
         <h2>Endividamento</h2>
         <table>
-          <thead><tr><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros mensal</th><th>Parcela</th><th>Venc.</th><th>Status</th><th>Editar</th></tr></thead>
+          <thead><tr><th>Data</th><th>Tipo</th><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros</th><th>Parcela</th><th>Venc.</th><th>Status</th><th>Relatorio</th><th>Editar</th></tr></thead>
           <tbody>
             {% for debt in debts %}
             <tr>
+              <td>{{ debt.debt_date or "" }}</td>
+              <td>{{ debt.creditor_type }}</td>
               <td>{{ debt.creditor }}</td>
               <td>{{ debt.description }}</td>
               <td>R$ {{ "%.2f"|format(debt.capital_value) }}</td>
-              <td>{{ "%.2f"|format(debt.monthly_interest_rate) }}%</td>
+              <td>{{ "%.2f"|format(debt.monthly_interest_rate) }}% {{ debt.interest_type }}</td>
               <td>R$ {{ "%.2f"|format(debt.installment_value) }}</td>
               <td>{{ debt.due_day }}</td>
               <td>{{ debt.status }}</td>
+              <td><a class="pill" href="/?tab=endividamento&debt_report={{ debt.id }}&debt_months={{ debt_report_months }}">Gerar evolucao</a></td>
               <td>
                 <details class="debt-edit">
                   <summary>Editar</summary>
                   <form action="/debts/{{ debt.id }}/update" method="post">
+                    <input name="debt_date" type="date" value="{{ debt.debt_date or '' }}">
                     <input name="creditor" value="{{ debt.creditor }}" required>
+                    <select name="creditor_type">
+                      <option value="Banco" {% if debt.creditor_type == "Banco" %}selected{% endif %}>Banco</option>
+                      <option value="Fornecedor" {% if debt.creditor_type == "Fornecedor" %}selected{% endif %}>Fornecedor</option>
+                      <option value="Pessoa Fisica" {% if debt.creditor_type == "Pessoa Fisica" %}selected{% endif %}>Pessoa Fisica</option>
+                      <option value="Governo/Impostos" {% if debt.creditor_type == "Governo/Impostos" %}selected{% endif %}>Governo/Impostos</option>
+                      <option value="Outro" {% if debt.creditor_type == "Outro" %}selected{% endif %}>Outro</option>
+                    </select>
                     <input name="description" value="{{ debt.description }}">
                     <input name="capital_value" type="number" step="0.01" value="{{ debt.capital_value }}">
                     <input name="monthly_interest_rate" type="number" step="0.01" value="{{ debt.monthly_interest_rate }}">
+                    <select name="interest_type">
+                      <option value="Compostos" {% if debt.interest_type == "Compostos" %}selected{% endif %}>Juros compostos</option>
+                      <option value="Simples" {% if debt.interest_type == "Simples" %}selected{% endif %}>Juros simples</option>
+                    </select>
                     <input name="installment_value" type="number" step="0.01" value="{{ debt.installment_value }}">
                     <input name="due_day" type="number" min="1" max="31" value="{{ debt.due_day }}">
                     <select name="status">
@@ -439,6 +466,39 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div class="panel">
+        <h2>Relatorio de evolucao da divida</h2>
+        <form action="/" method="get">
+          <input type="hidden" name="tab" value="endividamento">
+          <select name="debt_report">
+            <option value="">Escolha uma divida</option>
+            {% for debt in debts %}
+            <option value="{{ debt.id }}" {% if debt_report.debt and debt_report.debt.id == debt.id %}selected{% endif %}>{{ debt.creditor }} - {{ debt.description }}</option>
+            {% endfor %}
+          </select>
+          <input name="debt_months" type="number" min="1" max="120" value="{{ debt_report.months }}" placeholder="Meses">
+          <button type="submit">Gerar relatorio</button>
+        </form>
+        {% if debt_report.debt %}
+        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}.</p>
+        <table>
+          <thead><tr><th>Mes</th><th>Saldo inicial</th><th>Juros</th><th>Parcela</th><th>Saldo final</th></tr></thead>
+          <tbody>
+            {% for row in debt_report.rows %}
+            <tr>
+              <td>{{ row.month }}</td>
+              <td>R$ {{ "%.2f"|format(row.opening_balance) }}</td>
+              <td>R$ {{ "%.2f"|format(row.interest) }}</td>
+              <td>R$ {{ "%.2f"|format(row.installment) }}</td>
+              <td class="{{ 'negative' if row.closing_balance > 0 else 'positive' }}">R$ {{ "%.2f"|format(row.closing_balance) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="muted">Escolha uma divida para ver a evolucao mensal com juros simples ou compostos.</p>
+        {% endif %}
       </div>
     </section>
   </main>

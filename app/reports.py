@@ -117,3 +117,33 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
         "total_debt": total_debt,
         "monthly_installments": monthly_installments,
     }
+
+
+def debt_evolution(debt: Debt | None, months: int = 12) -> dict:
+    if not debt:
+        return {"debt": None, "rows": [], "months": months}
+
+    months = max(1, min(months, 120))
+    capital = debt.capital_value or 0
+    rate = (debt.monthly_interest_rate or 0) / 100
+    installment = debt.installment_value or 0
+    balance = capital
+    rows = []
+
+    for month in range(1, months + 1):
+        opening_balance = balance
+        if debt.interest_type == "Simples":
+            interest = capital * rate
+        else:
+            interest = opening_balance * rate
+        balance = max(opening_balance + interest - installment, 0)
+        rows.append(
+            {
+                "month": month,
+                "opening_balance": opening_balance,
+                "interest": interest,
+                "installment": installment,
+                "closing_balance": balance,
+            }
+        )
+    return {"debt": debt, "rows": rows, "months": months}

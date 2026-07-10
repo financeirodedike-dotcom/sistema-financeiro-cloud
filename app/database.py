@@ -1,6 +1,6 @@
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 try:
@@ -41,3 +41,21 @@ def init_db():
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    ensure_lightweight_migrations()
+
+
+def ensure_lightweight_migrations():
+    inspector = inspect(engine)
+    if "debts" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("debts")}
+    new_columns = {
+        "debt_date": "DATE",
+        "creditor_type": "VARCHAR(60) DEFAULT 'Banco'",
+        "interest_type": "VARCHAR(40) DEFAULT 'Compostos'",
+    }
+    with engine.begin() as connection:
+        for name, ddl in new_columns.items():
+            if name not in existing_columns:
+                connection.execute(text(f"ALTER TABLE debts ADD COLUMN {name} {ddl}"))
