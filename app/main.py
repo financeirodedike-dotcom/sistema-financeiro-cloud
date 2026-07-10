@@ -71,7 +71,7 @@ def startup():
 def login_page(request: Request, db: Session = Depends(get_db)):
     if current_user(request, db):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
+    return templates.TemplateResponse(request=request, name="login.html", context={"error": ""})
 
 
 @app.post("/login")
@@ -86,7 +86,7 @@ def login(email: str = Form(...), password: str = Form(...), db: Session = Depen
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "error": ""})
+    return templates.TemplateResponse(request=request, name="register.html", context={"error": ""})
 
 
 @app.post("/register")
@@ -143,9 +143,9 @@ def home(request: Request, db: Session = Depends(get_db)):
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
     purchases_report = purchases(db, company.id)
     return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
+        request=request,
+        name="index.html",
+        context={
             "user": user,
             "company": company,
             "accounts": accounts,
