@@ -1,0 +1,267 @@
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
+from app.classifier import classify_account
+from app.database import get_db, init_db
+from app.models import ClassificationRule, Company, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.ofx_parser import parse_ofx
+from app.reports import dashboard, dre, monthly_cashflow
+
+
+app = FastAPI(title="Sistema Financeiro")
+templates = Jinja2Templates(directory="app/templates")
+
+
+DEFAULT_ACCOUNTS = [
+    ("A classificar", "Outras", "Outras Receitas/Despesas", "Operacional"),
+    ("Venda a vista", "Receitas", "Receita Bruta", "Operacional"),
+    ("Venda a prazo antecipadas", "Receitas", "Receita Bruta", "Operacional"),
+    ("Materia prima", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("Material de consumo", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("Frete compras", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("SALARIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("Aluguel do imovel", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("Energia eletrica", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("Combustiveis", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("Pedagio", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("Tarifas Bancarias", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("Juros por atraso", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("Transferencia entre contas", "Transferencias", "Transferencias", "Transferencia"),
+]
+
+
+def seed_company_accounts(db: Session, company: Company) -> None:
+    existing = db.scalar(select(FinancialAccount).where(FinancialAccount.company_id == company.id).limit(1))
+    if existing:
+        return
+    for name, group, dre_line, cashflow in DEFAULT_ACCOUNTS:
+        db.add(
+            FinancialAccount(
+                company_id=company.id,
+                name=name,
+                group_name=group,
+                dre_line=dre_line,
+                cashflow_class=cashflow,
+            )
+        )
+    db.commit()
+
+
+def require_context(request: Request, db: Session) -> tuple[User, Company] | RedirectResponse:
+    user = current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    company = current_company(user, db)
+    if not company:
+        return RedirectResponse("/register", status_code=303)
+    return user, company
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, db: Session = Depends(get_db)):
+    if current_user(request, db):
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
+
+
+@app.post("/login")
+def login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = db.scalar(select(User).where(User.email == email.strip().lower(), User.is_active.is_(True)))
+    if not user or not verify_password(password, user.password_hash):
+        return RedirectResponse("/login?erro=1", status_code=303)
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(SESSION_COOKIE, create_session_token(user.id), httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request, "error": ""})
+
+
+@app.post("/register")
+def register(
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    company_name: str = Form(...),
+    document: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = User(name=name.strip(), email=email.strip().lower(), password_hash=hash_password(password))
+    company = Company(name=company_name.strip(), document=document.strip())
+    db.add_all([user, company])
+    db.flush()
+    db.add(Membership(user_id=user.id, company_id=company.id, role="owner"))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return RedirectResponse("/register?erro=email", status_code=303)
+    seed_company_accounts(db, company)
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(SESSION_COOKIE, create_session_token(user.id), httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    user, company = context
+    seed_company_accounts(db, company)
+    accounts = db.scalars(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.name)
+    ).all()
+    rules = db.scalars(
+        select(ClassificationRule).where(ClassificationRule.company_id == company.id).order_by(ClassificationRule.keyword)
+    ).all()
+    transactions = db.scalars(
+        select(Transaction).where(Transaction.company_id == company.id).order_by(Transaction.date.desc()).limit(200)
+    ).all()
+    imports = db.scalars(
+        select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
+    ).all()
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "user": user,
+            "company": company,
+            "accounts": accounts,
+            "rules": rules,
+            "transactions": transactions,
+            "imports": imports,
+            "dashboard": dashboard(db, company.id),
+            "cashflow": monthly_cashflow(db, company.id),
+            "dre": dre(db, company.id),
+        },
+    )
+
+
+@app.post("/import-ofx")
+async def import_ofx(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    content = await file.read()
+    parsed = parse_ofx(content, file.filename or "arquivo.ofx")
+    batch = ImportBatch(company_id=company.id, filename=file.filename or "arquivo.ofx")
+    db.add(batch)
+    db.flush()
+    imported = 0
+    skipped = 0
+    for item in parsed:
+        exists = None
+        if item.get("fitid"):
+            exists = db.scalar(
+                select(Transaction).where(
+                    Transaction.company_id == company.id,
+                    Transaction.fitid == item["fitid"],
+                    Transaction.amount == item["amount"],
+                    Transaction.date == item["date"],
+                )
+            )
+        if exists:
+            skipped += 1
+            continue
+        account = classify_account(db, company.id, item["history"])
+        db.add(Transaction(**item, company_id=company.id, import_batch_id=batch.id, account=account))
+        imported += 1
+    batch.imported_count = imported
+    batch.skipped_count = skipped
+    db.commit()
+    return RedirectResponse(f"/?imported={imported}&skipped={skipped}", status_code=303)
+
+
+@app.post("/accounts")
+def create_account(
+    request: Request,
+    name: str = Form(...),
+    group_name: str = Form("Outras"),
+    dre_line: str = Form("Outras Receitas/Despesas"),
+    cashflow_class: str = Form("Operacional"),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    existing = db.scalar(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.name == name.strip())
+    )
+    if existing:
+        existing.group_name = group_name
+        existing.dre_line = dre_line
+        existing.cashflow_class = cashflow_class
+    else:
+        db.add(
+            FinancialAccount(
+                company_id=company.id,
+                name=name.strip(),
+                group_name=group_name,
+                dre_line=dre_line,
+                cashflow_class=cashflow_class,
+            )
+        )
+    db.commit()
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/rules")
+def create_rule(request: Request, keyword: str = Form(...), account_id: int = Form(...), db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    account = db.scalar(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
+    )
+    if account:
+        db.add(ClassificationRule(company_id=company.id, keyword=keyword.strip(), account_id=account.id))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/transactions/{transaction_id}/classify")
+def classify_transaction(
+    request: Request,
+    transaction_id: int,
+    account_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    row = db.scalar(select(Transaction).where(Transaction.company_id == company.id, Transaction.id == transaction_id))
+    account = db.scalar(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
+    )
+    if row and account:
+        row.account_id = account.id
+        db.commit()
+    return RedirectResponse("/", status_code=303)
+

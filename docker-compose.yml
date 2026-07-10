@@ -1,0 +1,10 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:///./data/financeiro.db
+      SECRET_KEY: desenvolvimento-local-altere-em-producao
+    volumes:
+      - ./data:/app/data

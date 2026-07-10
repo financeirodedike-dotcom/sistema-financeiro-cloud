@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema Financeiro</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f5f7fb; color: #172033; }
+    header { background: #12355b; color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    header h1 { margin: 0; font-size: 24px; }
+    header small { display: block; margin-top: 4px; color: #d9e6f2; }
+    main { padding: 18px; display: grid; gap: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel, .kpi { background: white; border: 1px solid #d8dee9; border-radius: 8px; padding: 14px; }
+    .kpi span { color: #667085; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .kpi strong { display: block; margin-top: 6px; font-size: 24px; }
+    h2 { margin: 0 0 12px; color: #12355b; font-size: 17px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #12355b; color: white; text-align: left; }
+    th, td { padding: 8px; border-bottom: 1px solid #d8dee9; vertical-align: middle; }
+    tr:nth-child(even) { background: #f8fbff; }
+    input, select, button { padding: 9px 10px; border: 1px solid #d8dee9; border-radius: 6px; }
+    button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
+    .logout button { background: #ffffff; color: #12355b; border: 0; }
+    form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    .negative { color: #c1121f; font-weight: 700; }
+    .positive { color: #157347; font-weight: 700; }
+    .muted { color: #667085; }
+    .scroll { max-height: 420px; overflow: auto; border: 1px solid #d8dee9; border-radius: 8px; }
+    .status { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { display: inline-block; background: #eef4f8; border: 1px solid #d8dee9; border-radius: 999px; padding: 5px 9px; font-size: 12px; }
+    @media (max-width: 900px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .grid, .two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Sistema Financeiro</h1>
+      <small>{{ company.name }} | Usuario: {{ user.name }}</small>
+    </div>
+    <form class="logout" action="/logout" method="post">
+      <button type="submit">Sair</button>
+    </form>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="kpi"><span>Receitas</span><strong>R$ {{ "%.2f"|format(dashboard.receitas) }}</strong></div>
+      <div class="kpi"><span>Despesas</span><strong>R$ {{ "%.2f"|format(dashboard.despesas) }}</strong></div>
+      <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</strong></div>
+      <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
+    </section>
+
+    <section class="panel">
+      <h2>Importar OFX</h2>
+      <form action="/import-ofx" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".ofx" required>
+        <button type="submit">Importar arquivo OFX</button>
+      </form>
+      <p class="muted">O sistema registra cada lote importado e ignora lancamentos repetidos pelo identificador do banco.</p>
+      <div class="status">
+        {% for item in imports %}
+        <span class="pill">{{ item.filename }}: {{ item.imported_count }} novos, {{ item.skipped_count }} repetidos</span>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="two">
+      <div class="panel">
+        <h2>Nova conta financeira</h2>
+        <form action="/accounts" method="post">
+          <input name="name" placeholder="Conta financeira" required>
+          <input name="group_name" placeholder="Grupo" value="Outras">
+          <input name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
+          <input name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
+          <button type="submit">Salvar</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Nova regra de classificacao</h2>
+        <form action="/rules" method="post">
+          <input name="keyword" placeholder="Palavra-chave do extrato" required>
+          <select name="account_id">
+            {% for account in accounts %}
+            <option value="{{ account.id }}">{{ account.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Adicionar regra</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="two">
+      <div class="panel">
+        <h2>Fluxo de Caixa</h2>
+        <table>
+          <thead><tr><th>Mes</th><th>Entradas</th><th>Saidas</th><th>Saldo mes</th><th>Saldo acumulado</th></tr></thead>
+          <tbody>
+            {% for row in cashflow %}
+            <tr>
+              <td>{{ row.month }}</td>
+              <td>R$ {{ "%.2f"|format(row.entradas) }}</td>
+              <td>R$ {{ "%.2f"|format(row.saidas) }}</td>
+              <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.saldo_mes) }}</td>
+              <td class="{{ 'negative' if row.saldo_acumulado < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.saldo_acumulado) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>DRE Gerencial</h2>
+        <table>
+          <thead><tr><th>Linha</th><th>Valor</th></tr></thead>
+          <tbody>
+            {% for row in dre %}
+            <tr><td>{{ row.line }}</td><td class="{{ 'negative' if row.value < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.value) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Lancamentos recentes</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+          <tbody>
+            {% for row in transactions %}
+            <tr>
+              <td>{{ row.date }}</td>
+              <td>{{ row.history }}</td>
+              <td>{{ row.bank }}</td>
+              <td>{{ row.account.name if row.account else "A classificar" }}</td>
+              <td>R$ {{ "%.2f"|format(row.entrada) }}</td>
+              <td>R$ {{ "%.2f"|format(row.saida) }}</td>
+              <td>
+                <form action="/transactions/{{ row.id }}/classify" method="post">
+                  <select name="account_id">
+                    {% for account in accounts %}
+                    <option value="{{ account.id }}" {% if row.account and row.account.id == account.id %}selected{% endif %}>{{ account.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit">OK</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+
