@@ -3,7 +3,7 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Transaction
+from app.models import Debt, FinancialAccount, Transaction
 
 
 def dashboard(db: Session, company_id: int) -> dict:
@@ -55,3 +55,29 @@ def dre(db: Session, company_id: int) -> list[dict]:
         lines[line] += row.entrada - row.saida
     return [{"line": line, "value": value} for line, value in sorted(lines.items())]
 
+
+def purchases(db: Session, company_id: int) -> dict:
+    rows = db.scalars(
+        select(Transaction)
+        .join(FinancialAccount)
+        .where(Transaction.company_id == company_id, FinancialAccount.group_name == "Custos e Compras")
+        .order_by(Transaction.date.desc())
+        .limit(100)
+    ).all()
+    total = sum(row.saida for row in rows)
+    return {"rows": rows, "total": total, "count": len(rows)}
+
+
+def balance_sheet(db: Session, company_id: int) -> dict:
+    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    debts = db.scalars(select(Debt).where(Debt.company_id == company_id, Debt.status == "Ativo")).all()
+    cash_balance = sum(row.entrada - row.saida for row in rows)
+    debt_total = sum(row.capital_value for row in debts)
+    equity = cash_balance - debt_total
+    return {
+        "cash_balance": cash_balance,
+        "debt_total": debt_total,
+        "equity": equity,
+        "assets_total": cash_balance,
+        "liabilities_total": debt_total,
+    }

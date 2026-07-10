@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import ClassificationRule, Company, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.models import ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import dashboard, dre, monthly_cashflow
+from app.reports import balance_sheet, dashboard, dre, monthly_cashflow, purchases
 
 
 app = FastAPI(title="Sistema Financeiro")
@@ -140,6 +140,8 @@ def home(request: Request, db: Session = Depends(get_db)):
     imports = db.scalars(
         select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
     ).all()
+    debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+    purchases_report = purchases(db, company.id)
     return templates.TemplateResponse(
         "index.html",
         {
@@ -150,9 +152,12 @@ def home(request: Request, db: Session = Depends(get_db)):
             "rules": rules,
             "transactions": transactions,
             "imports": imports,
+            "debts": debts,
             "dashboard": dashboard(db, company.id),
             "cashflow": monthly_cashflow(db, company.id),
             "dre": dre(db, company.id),
+            "balance": balance_sheet(db, company.id),
+            "purchases": purchases_report,
         },
     )
 
@@ -245,6 +250,38 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
     return RedirectResponse("/", status_code=303)
 
 
+@app.post("/debts")
+def create_debt(
+    request: Request,
+    creditor: str = Form(...),
+    description: str = Form(""),
+    capital_value: float = Form(0),
+    monthly_interest_rate: float = Form(0),
+    installment_value: float = Form(0),
+    due_day: int = Form(1),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    db.add(
+        Debt(
+            company_id=company.id,
+            creditor=creditor.strip(),
+            description=description.strip(),
+            capital_value=capital_value,
+            monthly_interest_rate=monthly_interest_rate,
+            installment_value=installment_value,
+            due_day=due_day,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse("/#endividamento", status_code=303)
+
+
 @app.post("/transactions/{transaction_id}/classify")
 def classify_transaction(
     request: Request,
@@ -264,4 +301,3 @@ def classify_transaction(
         row.account_id = account.id
         db.commit()
     return RedirectResponse("/", status_code=303)
-

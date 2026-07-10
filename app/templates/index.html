@@ -9,7 +9,27 @@
     header { background: #12355b; color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
     header h1 { margin: 0; font-size: 24px; }
     header small { display: block; margin-top: 4px; color: #d9e6f2; }
-    main { padding: 18px; display: grid; gap: 16px; }
+    main { padding: 16px; display: grid; gap: 16px; }
+    .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; background: #eaf0f7; border-bottom: 1px solid #d8dee9; padding: 8px 12px; }
+    .tabs label { padding: 10px 12px; border-radius: 6px; color: #12355b; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    input[name="tab"] { display: none; }
+    .tab { display: none; }
+    #tab-dashboard:checked ~ .tabs label[for="tab-dashboard"],
+    #tab-extratos:checked ~ .tabs label[for="tab-extratos"],
+    #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
+    #tab-compras:checked ~ .tabs label[for="tab-compras"],
+    #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
+    #tab-dre:checked ~ .tabs label[for="tab-dre"],
+    #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
+    #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"] { background: #12355b; color: white; }
+    #tab-dashboard:checked ~ main #dashboard,
+    #tab-extratos:checked ~ main #extratos,
+    #tab-classificacao:checked ~ main #classificacao,
+    #tab-compras:checked ~ main #compras,
+    #tab-fluxo:checked ~ main #fluxo,
+    #tab-dre:checked ~ main #dre,
+    #tab-balanco:checked ~ main #balanco,
+    #tab-endividamento:checked ~ main #endividamento { display: grid; gap: 16px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .panel, .kpi { background: white; border: 1px solid #d8dee9; border-radius: 8px; padding: 14px; }
@@ -27,7 +47,7 @@
     .negative { color: #c1121f; font-weight: 700; }
     .positive { color: #157347; font-weight: 700; }
     .muted { color: #667085; }
-    .scroll { max-height: 420px; overflow: auto; border: 1px solid #d8dee9; border-radius: 8px; }
+    .scroll { max-height: 560px; overflow: auto; border: 1px solid #d8dee9; border-radius: 8px; }
     .status { display: flex; gap: 8px; flex-wrap: wrap; }
     .pill { display: inline-block; background: #eef4f8; border: 1px solid #d8dee9; border-radius: 999px; padding: 5px 9px; font-size: 12px; }
     @media (max-width: 900px) {
@@ -46,54 +66,156 @@
       <button type="submit">Sair</button>
     </form>
   </header>
+
+  <input id="tab-dashboard" name="tab" type="radio" checked>
+  <input id="tab-extratos" name="tab" type="radio">
+  <input id="tab-classificacao" name="tab" type="radio">
+  <input id="tab-compras" name="tab" type="radio">
+  <input id="tab-fluxo" name="tab" type="radio">
+  <input id="tab-dre" name="tab" type="radio">
+  <input id="tab-balanco" name="tab" type="radio">
+  <input id="tab-endividamento" name="tab" type="radio">
+
+  <nav class="tabs">
+    <label for="tab-dashboard">Dashboard</label>
+    <label for="tab-extratos">Extratos</label>
+    <label for="tab-classificacao">Classificacao</label>
+    <label for="tab-compras">Compras</label>
+    <label for="tab-fluxo">Fluxo de Caixa</label>
+    <label for="tab-dre">DRE</label>
+    <label for="tab-balanco">Balanco</label>
+    <label for="tab-endividamento">Endividamento</label>
+  </nav>
+
   <main>
-    <section class="grid">
-      <div class="kpi"><span>Receitas</span><strong>R$ {{ "%.2f"|format(dashboard.receitas) }}</strong></div>
-      <div class="kpi"><span>Despesas</span><strong>R$ {{ "%.2f"|format(dashboard.despesas) }}</strong></div>
-      <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</strong></div>
-      <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
-    </section>
-
-    <section class="panel">
-      <h2>Importar OFX</h2>
-      <form action="/import-ofx" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".ofx" required>
-        <button type="submit">Importar arquivo OFX</button>
-      </form>
-      <p class="muted">O sistema registra cada lote importado e ignora lancamentos repetidos pelo identificador do banco.</p>
-      <div class="status">
-        {% for item in imports %}
-        <span class="pill">{{ item.filename }}: {{ item.imported_count }} novos, {{ item.skipped_count }} repetidos</span>
-        {% endfor %}
+    <section id="dashboard" class="tab">
+      <div class="grid">
+        <div class="kpi"><span>Receitas</span><strong>R$ {{ "%.2f"|format(dashboard.receitas) }}</strong></div>
+        <div class="kpi"><span>Despesas</span><strong>R$ {{ "%.2f"|format(dashboard.despesas) }}</strong></div>
+        <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</strong></div>
+        <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
       </div>
-    </section>
-
-    <section class="two">
-      <div class="panel">
-        <h2>Nova conta financeira</h2>
-        <form action="/accounts" method="post">
-          <input name="name" placeholder="Conta financeira" required>
-          <input name="group_name" placeholder="Grupo" value="Outras">
-          <input name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
-          <input name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
-          <button type="submit">Salvar</button>
-        </form>
-      </div>
-      <div class="panel">
-        <h2>Nova regra de classificacao</h2>
-        <form action="/rules" method="post">
-          <input name="keyword" placeholder="Palavra-chave do extrato" required>
-          <select name="account_id">
-            {% for account in accounts %}
-            <option value="{{ account.id }}">{{ account.name }}</option>
+      <div class="two">
+        <div class="panel">
+          <h2>Resumo executivo</h2>
+          <table>
+            <tbody>
+              <tr><td>Total de lancamentos</td><td>{{ dashboard.total_lancamentos }}</td></tr>
+              <tr><td>Total em compras</td><td>R$ {{ "%.2f"|format(purchases.total) }}</td></tr>
+              <tr><td>Dividas cadastradas</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
+              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.equity) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Ultimas importacoes</h2>
+          <div class="status">
+            {% for item in imports %}
+            <span class="pill">{{ item.filename }}: {{ item.imported_count }} novos, {{ item.skipped_count }} repetidos</span>
             {% endfor %}
-          </select>
-          <button type="submit">Adicionar regra</button>
-        </form>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="two">
+    <section id="extratos" class="tab">
+      <div class="panel">
+        <h2>Importar OFX</h2>
+        <form action="/import-ofx" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".ofx" required>
+          <button type="submit">Importar arquivo OFX</button>
+        </form>
+        <p class="muted">O sistema registra cada lote importado e ignora lancamentos repetidos pelo identificador do banco.</p>
+      </div>
+      <div class="panel">
+        <h2>Banco de dados de lancamentos</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+            <tbody>
+              {% for row in transactions %}
+              <tr>
+                <td>{{ row.date }}</td>
+                <td>{{ row.history }}</td>
+                <td>{{ row.bank }}</td>
+                <td>{{ row.account.name if row.account else "A classificar" }}</td>
+                <td>R$ {{ "%.2f"|format(row.entrada) }}</td>
+                <td>R$ {{ "%.2f"|format(row.saida) }}</td>
+                <td>
+                  <form action="/transactions/{{ row.id }}/classify" method="post">
+                    <select name="account_id">
+                      {% for account in accounts %}
+                      <option value="{{ account.id }}" {% if row.account and row.account.id == account.id %}selected{% endif %}>{{ account.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit">OK</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="classificacao" class="tab">
+      <div class="two">
+        <div class="panel">
+          <h2>Nova conta financeira</h2>
+          <form action="/accounts" method="post">
+            <input name="name" placeholder="Conta financeira" required>
+            <input name="group_name" placeholder="Grupo" value="Outras">
+            <input name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
+            <input name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
+            <button type="submit">Salvar</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Nova regra de classificacao</h2>
+          <form action="/rules" method="post">
+            <input name="keyword" placeholder="Palavra-chave do extrato" required>
+            <select name="account_id">
+              {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Adicionar regra</button>
+          </form>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Plano de contas</h2>
+        <table>
+          <thead><tr><th>Conta</th><th>Grupo</th><th>Linha DRE</th><th>Fluxo</th></tr></thead>
+          <tbody>
+            {% for account in accounts %}
+            <tr><td>{{ account.name }}</td><td>{{ account.group_name }}</td><td>{{ account.dre_line }}</td><td>{{ account.cashflow_class }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="compras" class="tab">
+      <div class="grid">
+        <div class="kpi"><span>Total compras</span><strong>R$ {{ "%.2f"|format(purchases.total) }}</strong></div>
+        <div class="kpi"><span>Lancamentos</span><strong>{{ purchases.count }}</strong></div>
+      </div>
+      <div class="panel">
+        <h2>Compras classificadas</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Historico</th><th>Conta</th><th>Valor</th></tr></thead>
+          <tbody>
+            {% for row in purchases.rows %}
+            <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>R$ {{ "%.2f"|format(row.saida) }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fluxo" class="tab">
       <div class="panel">
         <h2>Fluxo de Caixa</h2>
         <table>
@@ -111,6 +233,9 @@
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section id="dre" class="tab">
       <div class="panel">
         <h2>DRE Gerencial</h2>
         <table>
@@ -124,30 +249,57 @@
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Lancamentos recentes</h2>
-      <div class="scroll">
+    <section id="balanco" class="tab">
+      <div class="two">
+        <div class="panel">
+          <h2>Ativo</h2>
+          <table>
+            <tbody>
+              <tr><td>Caixa e bancos gerencial</td><td class="{{ 'negative' if balance.cash_balance < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.cash_balance) }}</td></tr>
+              <tr><td>Total do ativo</td><td>R$ {{ "%.2f"|format(balance.assets_total) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Passivo e patrimonio</h2>
+          <table>
+            <tbody>
+              <tr><td>Endividamento cadastrado</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
+              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.equity) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="endividamento" class="tab">
+      <div class="panel">
+        <h2>Novo emprestimo ou divida</h2>
+        <form action="/debts" method="post">
+          <input name="creditor" placeholder="Credor" required>
+          <input name="description" placeholder="Descricao">
+          <input name="capital_value" type="number" step="0.01" placeholder="Capital">
+          <input name="monthly_interest_rate" type="number" step="0.01" placeholder="Juros mensal %">
+          <input name="installment_value" type="number" step="0.01" placeholder="Parcela mensal">
+          <input name="due_day" type="number" min="1" max="31" placeholder="Dia venc.">
+          <input name="notes" placeholder="Observacoes">
+          <button type="submit">Salvar divida</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Endividamento</h2>
         <table>
-          <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+          <thead><tr><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros mensal</th><th>Parcela</th><th>Venc.</th><th>Status</th></tr></thead>
           <tbody>
-            {% for row in transactions %}
+            {% for debt in debts %}
             <tr>
-              <td>{{ row.date }}</td>
-              <td>{{ row.history }}</td>
-              <td>{{ row.bank }}</td>
-              <td>{{ row.account.name if row.account else "A classificar" }}</td>
-              <td>R$ {{ "%.2f"|format(row.entrada) }}</td>
-              <td>R$ {{ "%.2f"|format(row.saida) }}</td>
-              <td>
-                <form action="/transactions/{{ row.id }}/classify" method="post">
-                  <select name="account_id">
-                    {% for account in accounts %}
-                    <option value="{{ account.id }}" {% if row.account and row.account.id == account.id %}selected{% endif %}>{{ account.name }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="submit">OK</button>
-                </form>
-              </td>
+              <td>{{ debt.creditor }}</td>
+              <td>{{ debt.description }}</td>
+              <td>R$ {{ "%.2f"|format(debt.capital_value) }}</td>
+              <td>{{ "%.2f"|format(debt.monthly_interest_rate) }}%</td>
+              <td>R$ {{ "%.2f"|format(debt.installment_value) }}</td>
+              <td>{{ debt.due_day }}</td>
+              <td>{{ debt.status }}</td>
             </tr>
             {% endfor %}
           </tbody>

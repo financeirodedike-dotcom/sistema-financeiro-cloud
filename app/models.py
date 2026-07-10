@@ -124,3 +124,20 @@ class BalanceAdjustment(Base):
 
     company: Mapped[Company] = relationship()
 
+
+class Debt(Base):
+    __tablename__ = "debts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    creditor: Mapped[str] = mapped_column(String(160), index=True)
+    description: Mapped[str] = mapped_column(String(240), default="")
+    capital_value: Mapped[float] = mapped_column(Float, default=0)
+    monthly_interest_rate: Mapped[float] = mapped_column(Float, default=0)
+    installment_value: Mapped[float] = mapped_column(Float, default=0)
+    due_day: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(40), default="Ativo")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
