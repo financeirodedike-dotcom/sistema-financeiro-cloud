@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sistema Financeiro</title>
+  <title>Business360 AI</title>
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background: #f5f7fb; color: #172033; }
-    header { background: #12355b; color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    header { background: linear-gradient(120deg, #061522, #12355b 58%, #0c8ec4); color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28); font-weight: 900; font-size: 18px; }
     header h1 { margin: 0; font-size: 24px; }
     header small { display: block; margin-top: 4px; color: #d9e6f2; }
     main { padding: 16px; display: grid; gap: 16px; }
@@ -21,7 +23,8 @@
     #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
     #tab-dre:checked ~ .tabs label[for="tab-dre"],
     #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
-    #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"] { background: #12355b; color: white; }
+    #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"],
+    #tab-mapa:checked ~ .tabs label[for="tab-mapa"] { background: #12355b; color: white; }
     #tab-dashboard:checked ~ main #dashboard,
     #tab-extratos:checked ~ main #extratos,
     #tab-classificacao:checked ~ main #classificacao,
@@ -29,7 +32,8 @@
     #tab-fluxo:checked ~ main #fluxo,
     #tab-dre:checked ~ main #dre,
     #tab-balanco:checked ~ main #balanco,
-    #tab-endividamento:checked ~ main #endividamento { display: grid; gap: 16px; }
+    #tab-endividamento:checked ~ main #endividamento,
+    #tab-mapa:checked ~ main #mapa { display: grid; gap: 16px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .three { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -54,6 +58,19 @@
     .class-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .class-tabs button { background: #eef4f8; color: #12355b; border: 1px solid #cbd6e2; }
     .class-tabs button:hover { background: #12355b; color: white; }
+    .hero360 { background: #071827; color: white; border-color: #12355b; }
+    .hero360 h2 { color: #4cc9f0; }
+    .pillar-grid, .module-grid, .roadmap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .pillar, .module-card, .roadmap-card { border: 1px solid #cbd6e2; border-radius: 8px; padding: 12px; background: white; }
+    .hero360 .pillar, .hero360 .module-card { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+    .module-card strong, .pillar strong { display: block; color: #12355b; margin-bottom: 6px; }
+    .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
+    .score-list { display: grid; gap: 8px; }
+    .score-row { display: grid; grid-template-columns: 120px 1fr 42px; gap: 10px; align-items: center; font-size: 13px; }
+    .score-track { height: 10px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
+    .score-fill { height: 100%; background: linear-gradient(90deg, #0f766e, #4cc9f0); }
+    .flowline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .flow-step { padding: 10px 12px; border-radius: 999px; background: #eef4f8; border: 1px solid #cbd6e2; color: #12355b; font-weight: 700; }
     .chart { display: grid; gap: 10px; }
     .chart-row { display: grid; grid-template-columns: 76px 1fr 92px; gap: 10px; align-items: center; font-size: 12px; }
     .bar-track { height: 12px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
@@ -67,15 +84,18 @@
     .debt-edit form { margin-top: 8px; padding: 10px; background: #f8fbff; border: 1px solid #d8dee9; border-radius: 8px; }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
-      .grid, .two, .three { grid-template-columns: 1fr; }
+      .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>Sistema Financeiro</h1>
-      <small>{{ company.name }} | Usuario: {{ user.name }}</small>
+    <div class="brand">
+      <div class="brand-mark">360</div>
+      <div>
+        <h1>Business360 AI</h1>
+        <small>O copiloto inteligente da empresa | {{ company.name }} | Usuario: {{ user.name }}</small>
+      </div>
     </div>
     <form class="logout" action="/logout" method="post">
       <button type="submit">Sair</button>
@@ -90,9 +110,10 @@
   <input id="tab-dre" name="tab" type="radio" {% if active_tab == "dre" %}checked{% endif %}>
   <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
   <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
+  <input id="tab-mapa" name="tab" type="radio" {% if active_tab == "mapa" %}checked{% endif %}>
 
   <nav class="tabs">
-    <label for="tab-dashboard">Dashboard</label>
+    <label for="tab-dashboard">Centro de Controle</label>
     <label for="tab-extratos">Extratos</label>
     <label for="tab-classificacao">Classificacao</label>
     <label for="tab-compras">Compras</label>
@@ -100,10 +121,22 @@
     <label for="tab-dre">DRE</label>
     <label for="tab-balanco">Balanco</label>
     <label for="tab-endividamento">Endividamento</label>
+    <label for="tab-mapa">Mapa Empresarial 360</label>
   </nav>
 
   <main>
     <section id="dashboard" class="tab">
+      <div class="panel hero360">
+        <h2>Centro de Controle Business360 AI</h2>
+        <p>ERP, BI e inteligencia gerencial em uma visao unica para acompanhar caixa, resultado, endividamento, compras e classificacoes pendentes.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Financeiro</strong><span>Fluxo, DRE, balanco, OFX e contas.</span></div>
+          <div class="pillar"><strong>Operacao</strong><span>Compras, producao, estoque e entregas.</span></div>
+          <div class="pillar"><strong>Comercial</strong><span>CRM, pedidos, margem e clientes.</span></div>
+          <div class="pillar"><strong>Pessoas</strong><span>RH, produtividade e rotinas internas.</span></div>
+          <div class="pillar"><strong>IA Consultiva</strong><span>Alertas, recomendacoes e plano de acao.</span></div>
+        </div>
+      </div>
       <div class="grid">
         <div class="kpi"><span>Receitas</span><strong>R$ {{ "%.2f"|format(dashboard.receitas) }}</strong></div>
         <div class="kpi"><span>Despesas</span><strong>R$ {{ "%.2f"|format(dashboard.despesas) }}</strong></div>
@@ -504,6 +537,120 @@
         {% else %}
         <p class="muted">Escolha uma divida para ver a evolucao mensal com juros simples ou compostos.</p>
         {% endif %}
+      </div>
+    </section>
+
+    <section id="mapa" class="tab">
+      <div class="panel hero360">
+        <h2>Mapa Empresarial Business360 AI</h2>
+        <p>Visao do sistema operacional da empresa: gestao, indicadores, automacoes, documentos, producao, RH, financeiro e recomendacoes inteligentes no mesmo ambiente.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>ERP</strong><span>Rotinas e cadastros essenciais da operacao.</span></div>
+          <div class="pillar"><strong>BI</strong><span>Indicadores claros para decisao diaria.</span></div>
+          <div class="pillar"><strong>IA</strong><span>Classificacao, alertas e sugestoes de acao.</span></div>
+          <div class="pillar"><strong>Consultoria 360</strong><span>Diagnostico e plano de melhoria por area.</span></div>
+          <div class="pillar"><strong>Universidade</strong><span>Treinamentos, manuais e padroes internos.</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Modulos principais</h2>
+        <div class="module-grid">
+          <div class="module-card"><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></div>
+          <div class="module-card"><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></div>
+          <div class="module-card"><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></div>
+          <div class="module-card"><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></div>
+          <div class="module-card"><strong>Comercial/CRM</strong><span>Clientes, funil, propostas, vendas e margem.</span></div>
+          <div class="module-card"><strong>Fiscal</strong><span>NF-e, NFS-e, impostos, documentos e integracao contabil.</span></div>
+          <div class="module-card"><strong>Inteligencia</strong><span>Alertas criticos, recomendacoes e leitura dos dados.</span></div>
+          <div class="module-card"><strong>Plataforma</strong><span>Usuarios, permissoes, auditoria, seguranca e API.</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Fluxo operacional modelo</h2>
+        <div class="flowline">
+          <span class="flow-step">Pedido</span>
+          <span class="flow-step">Separacao</span>
+          <span class="flow-step">Producao</span>
+          <span class="flow-step">Qualidade</span>
+          <span class="flow-step">Expedicao</span>
+          <span class="flow-step">Entrega</span>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Diagnostico 10 pilares</h2>
+          <div class="score-list">
+            <div class="score-row"><strong>Financeiro</strong><div class="score-track"><div class="score-fill" style="width:91%"></div></div><span>91</span></div>
+            <div class="score-row"><strong>Comercial</strong><div class="score-track"><div class="score-fill" style="width:87%"></div></div><span>87</span></div>
+            <div class="score-row"><strong>Marketing</strong><div class="score-track"><div class="score-fill" style="width:75%"></div></div><span>75</span></div>
+            <div class="score-row"><strong>RH</strong><div class="score-track"><div class="score-fill" style="width:64%"></div></div><span>64</span></div>
+            <div class="score-row"><strong>Producao</strong><div class="score-track"><div class="score-fill" style="width:48%"></div></div><span>48</span></div>
+            <div class="score-row"><strong>Compras</strong><div class="score-track"><div class="score-fill" style="width:72%"></div></div><span>72</span></div>
+            <div class="score-row"><strong>Estoque</strong><div class="score-track"><div class="score-fill" style="width:69%"></div></div><span>69</span></div>
+            <div class="score-row"><strong>Fiscal</strong><div class="score-track"><div class="score-fill" style="width:68%"></div></div><span>68</span></div>
+            <div class="score-row"><strong>Lideranca</strong><div class="score-track"><div class="score-fill" style="width:80%"></div></div><span>80</span></div>
+            <div class="score-row"><strong>Estrategia</strong><div class="score-track"><div class="score-fill" style="width:85%"></div></div><span>85</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Roadmap de implantacao</h2>
+          <div class="roadmap-grid">
+            <div class="roadmap-card"><strong>1. Fundacao</strong><br><span>Usuarios, empresas, permissoes e base.</span></div>
+            <div class="roadmap-card"><strong>2. Financeiro</strong><br><span>OFX, contas, relatorios e dashboard.</span></div>
+            <div class="roadmap-card"><strong>3. RH</strong><br><span>Equipe, cargos, documentos e rotina.</span></div>
+            <div class="roadmap-card"><strong>4. Producao</strong><br><span>Pedidos, etapas e indicadores.</span></div>
+            <div class="roadmap-card"><strong>5. Compras</strong><br><span>Fornecedores, estoque e compras.</span></div>
+            <div class="roadmap-card"><strong>6. Comercial</strong><br><span>CRM, vendas e margem.</span></div>
+            <div class="roadmap-card"><strong>7. Fiscal</strong><br><span>Notas, impostos e contabilidade.</span></div>
+            <div class="roadmap-card"><strong>8. Inteligencia</strong><br><span>IA, alertas e recomendacoes.</span></div>
+            <div class="roadmap-card"><strong>9. Consultoria</strong><br><span>Diagnostico 360 e plano de acao.</span></div>
+            <div class="roadmap-card"><strong>10. Plataforma</strong><br><span>API, integracoes e governanca.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Integracoes planejadas</h2>
+        <div class="status">
+          <span class="pill">Open Finance</span>
+          <span class="pill">WhatsApp Business</span>
+          <span class="pill">NF-e / NFS-e APIs</span>
+          <span class="pill">Bancos</span>
+          <span class="pill">Contabilidade</span>
+          <span class="pill">E-commerce</span>
+          <span class="pill">E-mail</span>
+          <span class="pill">APIs externas</span>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Seguranca e compliance</h2>
+          <table>
+            <tbody>
+              <tr><td>LGPD</td><td>Controle de dados sensiveis e consentimento.</td></tr>
+              <tr><td>Permissoes</td><td>Acesso por usuario, empresa e modulo.</td></tr>
+              <tr><td>Auditoria</td><td>Logs de importacao, alteracao e classificacao.</td></tr>
+              <tr><td>Backups</td><td>Rotina de recuperacao e continuidade.</td></tr>
+              <tr><td>2FA</td><td>Autenticacao reforcada para producao.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Proximos passos imediatos</h2>
+          <table>
+            <tbody>
+              <tr><td>Design system</td><td>Padronizar telas, cores, botoes e indicadores.</td></tr>
+              <tr><td>Banco de dados</td><td>Modelar modulos alem do financeiro.</td></tr>
+              <tr><td>MVP</td><td>Consolidar Financeiro, Classificacao e Dashboard.</td></tr>
+              <tr><td>Validacao</td><td>Testar com extratos reais e rotinas da empresa.</td></tr>
+              <tr><td>Escala</td><td>Preparar cloud, seguranca e integracoes.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>

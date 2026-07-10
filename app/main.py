@@ -16,7 +16,7 @@ from app.ofx_parser import parse_ofx
 from app.reports import balance_sheet, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, purchases
 
 
-app = FastAPI(title="Sistema Financeiro")
+app = FastAPI(title="Business360 AI")
 templates = Jinja2Templates(directory="app/templates")
 
 
