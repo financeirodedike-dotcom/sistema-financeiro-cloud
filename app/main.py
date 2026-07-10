@@ -1,3 +1,6 @@
+import hashlib
+from datetime import date
+
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -33,6 +36,27 @@ DEFAULT_ACCOUNTS = [
     ("Juros por atraso", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("Transferencia entre contas", "Transferencias", "Transferencias", "Transferencia"),
 ]
+
+BANK_SOURCES = [
+    "Banco do Brasil",
+    "Caixa Interno",
+    "Caixa Economica",
+    "Itau",
+    "Bradesco",
+    "Santander",
+    "Sicredi",
+    "Sicoob",
+    "Outro",
+]
+
+
+def parse_filter_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def seed_company_accounts(db: Session, company: Company) -> None:
@@ -134,8 +158,24 @@ def home(request: Request, db: Session = Depends(get_db)):
     rules = db.scalars(
         select(ClassificationRule).where(ClassificationRule.company_id == company.id).order_by(ClassificationRule.keyword)
     ).all()
-    transactions = db.scalars(
-        select(Transaction).where(Transaction.company_id == company.id).order_by(Transaction.date.desc()).limit(200)
+    date_from_raw = request.query_params.get("date_from", "")
+    date_to_raw = request.query_params.get("date_to", "")
+    bank_filter = request.query_params.get("bank", "")
+    date_from = parse_filter_date(date_from_raw)
+    date_to = parse_filter_date(date_to_raw)
+    transaction_query = select(Transaction).where(Transaction.company_id == company.id)
+    if date_from:
+        transaction_query = transaction_query.where(Transaction.date >= date_from)
+    if date_to:
+        transaction_query = transaction_query.where(Transaction.date <= date_to)
+    if bank_filter:
+        transaction_query = transaction_query.where(Transaction.bank == bank_filter)
+    transactions = db.scalars(transaction_query.order_by(Transaction.date.desc()).limit(500)).all()
+    bank_options = db.scalars(
+        select(Transaction.bank)
+        .where(Transaction.company_id == company.id, Transaction.bank != "")
+        .distinct()
+        .order_by(Transaction.bank)
     ).all()
     imports = db.scalars(
         select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
@@ -153,6 +193,14 @@ def home(request: Request, db: Session = Depends(get_db)):
             "transactions": transactions,
             "imports": imports,
             "debts": debts,
+            "bank_sources": BANK_SOURCES,
+            "bank_options": bank_options,
+            "filters": {
+                "date_from": date_from_raw,
+                "date_to": date_to_raw,
+                "bank": bank_filter,
+            },
+            "active_tab": request.query_params.get("tab", "dashboard"),
             "dashboard": dashboard(db, company.id),
             "cashflow": monthly_cashflow(db, company.id),
             "dre": dre(db, company.id),
@@ -164,13 +212,20 @@ def home(request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/import-ofx")
-async def import_ofx(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_ofx(
+    request: Request,
+    file: UploadFile = File(...),
+    bank_account: str = Form(""),
+    bank_other: str = Form(""),
+    db: Session = Depends(get_db),
+):
     context = require_context(request, db)
     if isinstance(context, RedirectResponse):
         return context
     _user, company = context
     content = await file.read()
     parsed = parse_ofx(content, file.filename or "arquivo.ofx")
+    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
     batch = ImportBatch(company_id=company.id, filename=file.filename or "arquivo.ofx")
     db.add(batch)
     db.flush()
@@ -190,13 +245,58 @@ async def import_ofx(request: Request, file: UploadFile = File(...), db: Session
         if exists:
             skipped += 1
             continue
+        if source:
+            item["bank"] = source
         account = classify_account(db, company.id, item["history"])
         db.add(Transaction(**item, company_id=company.id, import_batch_id=batch.id, account=account))
         imported += 1
     batch.imported_count = imported
     batch.skipped_count = skipped
     db.commit()
-    return RedirectResponse(f"/?imported={imported}&skipped={skipped}", status_code=303)
+    return RedirectResponse(f"/?tab=extratos&imported={imported}&skipped={skipped}", status_code=303)
+
+
+@app.post("/transactions/manual")
+def create_manual_transaction(
+    request: Request,
+    transaction_date: date = Form(...),
+    history: str = Form(...),
+    amount: float = Form(...),
+    bank_account: str = Form("Caixa Interno"),
+    bank_other: str = Form(""),
+    account_id: int | None = Form(None),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    account = None
+    if account_id:
+        account = db.scalar(
+            select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
+        )
+    if not account:
+        account = classify_account(db, company.id, history)
+    fingerprint = f"{company.id}|{transaction_date.isoformat()}|{history.strip()}|{amount}|{source}"
+    db.add(
+        Transaction(
+            company_id=company.id,
+            date=transaction_date,
+            history=history.strip(),
+            bank=source or "Caixa Interno",
+            fitid="manual-" + hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
+            amount=amount,
+            entrada=amount if amount > 0 else 0,
+            saida=abs(amount) if amount < 0 else 0,
+            notes=notes.strip() or "Lancamento manual",
+            account=account,
+        )
+    )
+    db.commit()
+    return RedirectResponse("/?tab=extratos", status_code=303)
 
 
 @app.post("/accounts")
@@ -333,4 +433,4 @@ def classify_transaction(
     if row and account:
         row.account_id = account.id
         db.commit()
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/?tab=extratos", status_code=303)

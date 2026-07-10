@@ -79,14 +79,14 @@
     </form>
   </header>
 
-  <input id="tab-dashboard" name="tab" type="radio" checked>
-  <input id="tab-extratos" name="tab" type="radio">
-  <input id="tab-classificacao" name="tab" type="radio">
-  <input id="tab-compras" name="tab" type="radio">
-  <input id="tab-fluxo" name="tab" type="radio">
-  <input id="tab-dre" name="tab" type="radio">
-  <input id="tab-balanco" name="tab" type="radio">
-  <input id="tab-endividamento" name="tab" type="radio">
+  <input id="tab-dashboard" name="tab" type="radio" {% if active_tab == "dashboard" %}checked{% endif %}>
+  <input id="tab-extratos" name="tab" type="radio" {% if active_tab == "extratos" %}checked{% endif %}>
+  <input id="tab-classificacao" name="tab" type="radio" {% if active_tab == "classificacao" %}checked{% endif %}>
+  <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
+  <input id="tab-fluxo" name="tab" type="radio" {% if active_tab == "fluxo" %}checked{% endif %}>
+  <input id="tab-dre" name="tab" type="radio" {% if active_tab == "dre" %}checked{% endif %}>
+  <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
+  <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
 
   <nav class="tabs">
     <label for="tab-dashboard">Dashboard</label>
@@ -171,13 +171,59 @@
     </section>
 
     <section id="extratos" class="tab">
+      <div class="two">
+        <div class="panel">
+          <h2>Importar OFX</h2>
+          <form action="/import-ofx" method="post" enctype="multipart/form-data">
+            <select name="bank_account" required>
+              <option value="">Escolha banco/caixa</option>
+              {% for source in bank_sources %}
+              <option value="{{ source }}">{{ source }}</option>
+              {% endfor %}
+            </select>
+            <input name="bank_other" placeholder="Outro banco, se necessario">
+            <input type="file" name="file" accept=".ofx" required>
+            <button type="submit">Importar arquivo OFX</button>
+          </form>
+          <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros.</p>
+        </div>
+        <div class="panel">
+          <h2>Lancamento manual</h2>
+          <form action="/transactions/manual" method="post">
+            <input name="transaction_date" type="date" required>
+            <select name="bank_account" required>
+              {% for source in bank_sources %}
+              <option value="{{ source }}" {% if source == "Caixa Interno" %}selected{% endif %}>{{ source }}</option>
+              {% endfor %}
+            </select>
+            <input name="bank_other" placeholder="Outro banco, se necessario">
+            <input name="history" placeholder="Historico" required>
+            <input name="amount" type="number" step="0.01" placeholder="Valor +entrada / -saida" required>
+            <select name="account_id">
+              <option value="">Classificar automaticamente</option>
+              {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Adicionar</button>
+          </form>
+        </div>
+      </div>
       <div class="panel">
-        <h2>Importar OFX</h2>
-        <form action="/import-ofx" method="post" enctype="multipart/form-data">
-          <input type="file" name="file" accept=".ofx" required>
-          <button type="submit">Importar arquivo OFX</button>
+        <h2>Pesquisar extratos</h2>
+        <form action="/" method="get">
+          <input type="hidden" name="tab" value="extratos">
+          <input name="date_from" type="date" value="{{ filters.date_from }}">
+          <input name="date_to" type="date" value="{{ filters.date_to }}">
+          <select name="bank">
+            <option value="">Todos os bancos/caixas</option>
+            {% for bank in bank_options %}
+            <option value="{{ bank }}" {% if filters.bank == bank %}selected{% endif %}>{{ bank }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Pesquisar</button>
+          <a class="pill" href="/?tab=extratos">Limpar filtros</a>
         </form>
-        <p class="muted">O sistema registra cada lote importado e ignora lancamentos repetidos pelo identificador do banco.</p>
       </div>
       <div class="panel">
         <h2>Banco de dados de lancamentos</h2>
