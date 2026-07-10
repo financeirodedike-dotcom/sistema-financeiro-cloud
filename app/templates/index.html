@@ -50,6 +50,10 @@
     th, td { padding: 8px; border-bottom: 1px solid #d8dee9; vertical-align: middle; }
     tfoot td { background: #eef4f8; font-weight: 800; }
     tr:nth-child(even) { background: #f8fbff; }
+    tr.classified-row { background: #ecfdf3; }
+    tr.pending-row { background: #fff8e6; }
+    tr.classified-row:nth-child(even) { background: #dcfce7; }
+    tr.pending-row:nth-child(even) { background: #fff1c2; }
     input, select, button { padding: 9px 10px; border: 1px solid #d8dee9; border-radius: 6px; }
     button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
     .logout button { background: #ffffff; color: #12355b; border: 0; }
@@ -72,6 +76,12 @@
     .hero360 .pillar, .hero360 .module-card { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
     .module-card strong, .pillar strong { display: block; color: #12355b; margin-bottom: 6px; }
     .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
+    .finance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .finance-tab { display: inline-flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 8px; background: #eef4f8; color: #12355b; border: 1px solid #cbd6e2; text-decoration: none; font-weight: 800; }
+    .finance-tab:hover { background: #12355b; color: white; }
+    .finance-tab span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: rgba(15,118,110,.12); font-size: 12px; }
+    .status-ok { color: #157347; background: #dcfce7; border-color: #bbf7d0; }
+    .status-pending { color: #9a6700; background: #fff8e6; border-color: #fde68a; }
     .score-list { display: grid; gap: 8px; }
     .score-row { display: grid; grid-template-columns: 120px 1fr 42px; gap: 10px; align-items: center; font-size: 13px; }
     .score-track { height: 10px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
@@ -230,6 +240,14 @@
 
       <div class="panel">
         <h2>Areas do financeiro</h2>
+        <div class="finance-tabs">
+          <a class="finance-tab" href="/?tab=extratos"><span>01</span> Extratos</a>
+          <a class="finance-tab" href="/?tab=classificacao"><span>02</span> Classificacao</a>
+          <a class="finance-tab" href="/?tab=fluxo"><span>03</span> Fluxo de Caixa</a>
+          <a class="finance-tab" href="/?tab=dre"><span>04</span> DRE</a>
+          <a class="finance-tab" href="/?tab=endividamento"><span>05</span> Endividamento</a>
+        </div>
+        <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
           <a class="module-card" href="/?tab=extratos">
             <strong>Extratos</strong>
@@ -341,14 +359,22 @@
         <h2>Banco de dados de lancamentos</h2>
         <div class="scroll">
           <table>
-            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
             <tbody>
               {% for row in transactions %}
-              <tr>
+              {% set is_classified = row.account and row.account.name != "A classificar" %}
+              <tr class="{{ 'classified-row' if is_classified else 'pending-row' }}">
                 <td>{{ row.date }}</td>
                 <td>{{ row.history }}</td>
                 <td>{{ row.bank }}</td>
                 <td>{{ row.account.name if row.account else "A classificar" }}</td>
+                <td>
+                  {% if is_classified %}
+                  <span class="pill status-ok">Lancado / classificado</span>
+                  {% else %}
+                  <span class="pill status-pending">Pendente</span>
+                  {% endif %}
+                </td>
                 <td>R$ {{ "%.2f"|format(row.entrada) }}</td>
                 <td>R$ {{ "%.2f"|format(row.saida) }}</td>
                 <td>
