@@ -81,3 +81,39 @@ def balance_sheet(db: Session, company_id: int) -> dict:
         "assets_total": cash_balance,
         "liabilities_total": debt_total,
     }
+
+
+def dashboard_charts(db: Session, company_id: int) -> dict:
+    cashflow = monthly_cashflow(db, company_id)
+    max_flow = max([row["entradas"] for row in cashflow] + [row["saidas"] for row in cashflow] + [1])
+    flow_rows = [
+        {
+            **row,
+            "entrada_pct": round((row["entradas"] / max_flow) * 100, 2),
+            "saida_pct": round((row["saidas"] / max_flow) * 100, 2),
+        }
+        for row in cashflow[-12:]
+    ]
+
+    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    by_group = defaultdict(float)
+    for row in rows:
+        if row.saida <= 0:
+            continue
+        group = row.account.group_name if row.account else "A classificar"
+        by_group[group] += row.saida
+    max_group = max(list(by_group.values()) + [1])
+    expense_groups = [
+        {"group": group, "value": value, "pct": round((value / max_group) * 100, 2)}
+        for group, value in sorted(by_group.items(), key=lambda item: item[1], reverse=True)[:8]
+    ]
+
+    debts = db.scalars(select(Debt).where(Debt.company_id == company_id, Debt.status == "Ativo")).all()
+    total_debt = sum(row.capital_value for row in debts)
+    monthly_installments = sum(row.installment_value for row in debts)
+    return {
+        "flow_rows": flow_rows,
+        "expense_groups": expense_groups,
+        "total_debt": total_debt,
+        "monthly_installments": monthly_installments,
+    }

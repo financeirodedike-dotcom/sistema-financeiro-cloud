@@ -10,7 +10,7 @@ from app.classifier import classify_account
 from app.database import get_db, init_db
 from app.models import ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import balance_sheet, dashboard, dre, monthly_cashflow, purchases
+from app.reports import balance_sheet, dashboard, dashboard_charts, dre, monthly_cashflow, purchases
 
 
 app = FastAPI(title="Sistema Financeiro")
@@ -158,6 +158,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "dre": dre(db, company.id),
             "balance": balance_sheet(db, company.id),
             "purchases": purchases_report,
+            "charts": dashboard_charts(db, company.id),
         },
     )
 
@@ -279,6 +280,38 @@ def create_debt(
         )
     )
     db.commit()
+    return RedirectResponse("/#endividamento", status_code=303)
+
+
+@app.post("/debts/{debt_id}/update")
+def update_debt(
+    request: Request,
+    debt_id: int,
+    creditor: str = Form(...),
+    description: str = Form(""),
+    capital_value: float = Form(0),
+    monthly_interest_rate: float = Form(0),
+    installment_value: float = Form(0),
+    due_day: int = Form(1),
+    status: str = Form("Ativo"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
+    if debt:
+        debt.creditor = creditor.strip()
+        debt.description = description.strip()
+        debt.capital_value = capital_value
+        debt.monthly_interest_rate = monthly_interest_rate
+        debt.installment_value = installment_value
+        debt.due_day = due_day
+        debt.status = status
+        debt.notes = notes.strip()
+        db.commit()
     return RedirectResponse("/#endividamento", status_code=303)
 
 

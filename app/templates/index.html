@@ -31,6 +31,7 @@
     #tab-balanco:checked ~ main #balanco,
     #tab-endividamento:checked ~ main #endividamento { display: grid; gap: 16px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .three { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .panel, .kpi { background: white; border: 1px solid #d8dee9; border-radius: 8px; padding: 14px; }
     .kpi span { color: #667085; font-size: 12px; font-weight: 700; text-transform: uppercase; }
@@ -50,9 +51,20 @@
     .scroll { max-height: 560px; overflow: auto; border: 1px solid #d8dee9; border-radius: 8px; }
     .status { display: flex; gap: 8px; flex-wrap: wrap; }
     .pill { display: inline-block; background: #eef4f8; border: 1px solid #d8dee9; border-radius: 999px; padding: 5px 9px; font-size: 12px; }
+    .chart { display: grid; gap: 10px; }
+    .chart-row { display: grid; grid-template-columns: 76px 1fr 92px; gap: 10px; align-items: center; font-size: 12px; }
+    .bar-track { height: 12px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; min-width: 2px; border-radius: 999px; }
+    .bar.in { background: #0f766e; }
+    .bar.out { background: #c1121f; }
+    .bar.group { background: #12355b; }
+    .mini-bars { display: grid; gap: 5px; }
+    .debt-edit { margin-top: 8px; }
+    .debt-edit summary { display: inline-block; padding: 7px 10px; border-radius: 6px; background: #12355b; color: white; font-weight: 700; cursor: pointer; }
+    .debt-edit form { margin-top: 8px; padding: 10px; background: #f8fbff; border: 1px solid #d8dee9; border-radius: 8px; }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
-      .grid, .two { grid-template-columns: 1fr; }
+      .grid, .two, .three { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -114,6 +126,46 @@
             <span class="pill">{{ item.filename }}: {{ item.imported_count }} novos, {{ item.skipped_count }} repetidos</span>
             {% endfor %}
           </div>
+        </div>
+      </div>
+      <div class="three">
+        <div class="panel">
+          <h2>Entradas x saidas por mes</h2>
+          <div class="chart">
+            {% for row in charts.flow_rows %}
+            <div class="chart-row">
+              <strong>{{ row.month }}</strong>
+              <div class="mini-bars">
+                <div class="bar-track"><div class="bar in" style="width: {{ row.entrada_pct }}%"></div></div>
+                <div class="bar-track"><div class="bar out" style="width: {{ row.saida_pct }}%"></div></div>
+              </div>
+              <span>R$ {{ "%.0f"|format(row.saldo_mes) }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <p class="muted">Verde: entradas. Vermelho: saidas. Valor lateral: saldo do mes.</p>
+        </div>
+        <div class="panel">
+          <h2>Despesas por grupo</h2>
+          <div class="chart">
+            {% for row in charts.expense_groups %}
+            <div class="chart-row">
+              <strong>{{ row.group }}</strong>
+              <div class="bar-track"><div class="bar group" style="width: {{ row.pct }}%"></div></div>
+              <span>R$ {{ "%.0f"|format(row.value) }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Endividamento</h2>
+          <table>
+            <tbody>
+              <tr><td>Capital em aberto</td><td>R$ {{ "%.2f"|format(charts.total_debt) }}</td></tr>
+              <tr><td>Parcelas mensais</td><td>R$ {{ "%.2f"|format(charts.monthly_installments) }}</td></tr>
+              <tr><td>Peso sobre receitas</td><td>{% if dashboard.receitas > 0 %}{{ "%.1f"|format((charts.monthly_installments / dashboard.receitas) * 100) }}%{% else %}0.0%{% endif %}</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -289,7 +341,7 @@
       <div class="panel">
         <h2>Endividamento</h2>
         <table>
-          <thead><tr><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros mensal</th><th>Parcela</th><th>Venc.</th><th>Status</th></tr></thead>
+          <thead><tr><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros mensal</th><th>Parcela</th><th>Venc.</th><th>Status</th><th>Editar</th></tr></thead>
           <tbody>
             {% for debt in debts %}
             <tr>
@@ -300,6 +352,26 @@
               <td>R$ {{ "%.2f"|format(debt.installment_value) }}</td>
               <td>{{ debt.due_day }}</td>
               <td>{{ debt.status }}</td>
+              <td>
+                <details class="debt-edit">
+                  <summary>Editar</summary>
+                  <form action="/debts/{{ debt.id }}/update" method="post">
+                    <input name="creditor" value="{{ debt.creditor }}" required>
+                    <input name="description" value="{{ debt.description }}">
+                    <input name="capital_value" type="number" step="0.01" value="{{ debt.capital_value }}">
+                    <input name="monthly_interest_rate" type="number" step="0.01" value="{{ debt.monthly_interest_rate }}">
+                    <input name="installment_value" type="number" step="0.01" value="{{ debt.installment_value }}">
+                    <input name="due_day" type="number" min="1" max="31" value="{{ debt.due_day }}">
+                    <select name="status">
+                      <option value="Ativo" {% if debt.status == "Ativo" %}selected{% endif %}>Ativo</option>
+                      <option value="Quitado" {% if debt.status == "Quitado" %}selected{% endif %}>Quitado</option>
+                      <option value="Suspenso" {% if debt.status == "Suspenso" %}selected{% endif %}>Suspenso</option>
+                    </select>
+                    <input name="notes" value="{{ debt.notes }}">
+                    <button type="submit">Salvar edicao</button>
+                  </form>
+                </details>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -309,4 +381,3 @@
   </main>
 </body>
 </html>
-
