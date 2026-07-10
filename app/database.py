@@ -52,6 +52,7 @@ def ensure_lightweight_migrations():
     existing_columns = {column["name"] for column in inspector.get_columns("debts")}
     new_columns = {
         "debt_date": "DATE",
+        "due_date": "DATE",
         "creditor_type": "VARCHAR(60) DEFAULT 'Banco'",
         "interest_type": "VARCHAR(40) DEFAULT 'Compostos'",
     }

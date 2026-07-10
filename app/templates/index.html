@@ -392,6 +392,7 @@
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
           <input name="debt_date" type="date" title="Data da divida">
+          <input name="due_date" type="date" title="Data de vencimento">
           <input name="creditor" placeholder="Credor" required>
           <select name="creditor_type">
             <option value="Banco">Banco</option>
@@ -408,7 +409,7 @@
             <option value="Simples">Juros simples</option>
           </select>
           <input name="installment_value" type="number" step="0.01" placeholder="Parcela mensal">
-          <input name="due_day" type="number" min="1" max="31" placeholder="Dia venc.">
+          <input name="due_day" type="number" min="1" max="31" placeholder="Dia venc. recorrente">
           <input name="notes" placeholder="Observacoes">
           <button type="submit">Salvar divida</button>
         </form>
@@ -416,11 +417,14 @@
       <div class="panel">
         <h2>Endividamento</h2>
         <table>
-          <thead><tr><th>Data</th><th>Tipo</th><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros</th><th>Parcela</th><th>Venc.</th><th>Status</th><th>Relatorio</th><th>Editar</th></tr></thead>
+          <thead><tr><th>Data divida</th><th>Vencimento</th><th>Dias atraso</th><th>Tipo</th><th>Credor</th><th>Descricao</th><th>Capital</th><th>Juros</th><th>Parcela</th><th>Dia recorr.</th><th>Status</th><th>Relatorio</th><th>Editar</th></tr></thead>
           <tbody>
-            {% for debt in debts %}
+            {% for item in debt_rows %}
+            {% set debt = item.debt %}
             <tr>
               <td>{{ debt.debt_date or "" }}</td>
+              <td>{{ debt.due_date or "" }}</td>
+              <td class="{{ 'negative' if item.overdue_days > 0 else 'positive' }}">{{ item.overdue_days }}</td>
               <td>{{ debt.creditor_type }}</td>
               <td>{{ debt.creditor }}</td>
               <td>{{ debt.description }}</td>
@@ -435,6 +439,7 @@
                   <summary>Editar</summary>
                   <form action="/debts/{{ debt.id }}/update" method="post">
                     <input name="debt_date" type="date" value="{{ debt.debt_date or '' }}">
+                    <input name="due_date" type="date" value="{{ debt.due_date or '' }}">
                     <input name="creditor" value="{{ debt.creditor }}" required>
                     <select name="creditor_type">
                       <option value="Banco" {% if debt.creditor_type == "Banco" %}selected{% endif %}>Banco</option>

@@ -59,6 +59,12 @@ def parse_filter_date(value: str | None) -> date | None:
         return None
 
 
+def debt_overdue_days(debt: Debt) -> int:
+    if not debt.due_date or debt.status != "Ativo":
+        return 0
+    return max((date.today() - debt.due_date).days, 0)
+
+
 def seed_company_accounts(db: Session, company: Company) -> None:
     existing = db.scalar(select(FinancialAccount).where(FinancialAccount.company_id == company.id).limit(1))
     if existing:
@@ -181,6 +187,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
     ).all()
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+    debt_rows = [{"debt": debt, "overdue_days": debt_overdue_days(debt)} for debt in debts]
     purchases_report = purchases(db, company.id)
     report_debt_id = request.query_params.get("debt_report")
     report_months_raw = request.query_params.get("debt_months", "12")
@@ -205,6 +212,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "transactions": transactions,
             "imports": imports,
             "debts": debts,
+            "debt_rows": debt_rows,
             "debt_report": debt_evolution(selected_debt, report_months),
             "debt_report_months": report_months,
             "bank_sources": BANK_SOURCES,
@@ -369,6 +377,7 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
 def create_debt(
     request: Request,
     debt_date: str = Form(""),
+    due_date: str = Form(""),
     creditor: str = Form(...),
     creditor_type: str = Form("Banco"),
     description: str = Form(""),
@@ -388,6 +397,7 @@ def create_debt(
         Debt(
             company_id=company.id,
             debt_date=parse_filter_date(debt_date),
+            due_date=parse_filter_date(due_date),
             creditor=creditor.strip(),
             creditor_type=creditor_type,
             description=description.strip(),
@@ -408,6 +418,7 @@ def update_debt(
     request: Request,
     debt_id: int,
     debt_date: str = Form(""),
+    due_date: str = Form(""),
     creditor: str = Form(...),
     creditor_type: str = Form("Banco"),
     description: str = Form(""),
@@ -427,6 +438,7 @@ def update_debt(
     debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
     if debt:
         debt.debt_date = parse_filter_date(debt_date)
+        debt.due_date = parse_filter_date(due_date)
         debt.creditor = creditor.strip()
         debt.creditor_type = creditor_type
         debt.description = description.strip()

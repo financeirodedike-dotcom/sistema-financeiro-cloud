@@ -138,6 +138,7 @@ class Debt(Base):
     monthly_interest_rate: Mapped[float] = mapped_column(Float, default=0)
     interest_type: Mapped[str] = mapped_column(String(40), default="Compostos")
     installment_value: Mapped[float] = mapped_column(Float, default=0)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_day: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(40), default="Ativo")
     notes: Mapped[str] = mapped_column(Text, default="")
