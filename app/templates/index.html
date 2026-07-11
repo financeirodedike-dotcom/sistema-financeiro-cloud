@@ -25,6 +25,13 @@
     #tab-dre:checked ~ .tabs label[for="tab-dre"],
     #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
     #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"],
+    #tab-contas-pagar:checked ~ .tabs label[for="tab-contas-pagar"],
+    #tab-contas-receber:checked ~ .tabs label[for="tab-contas-receber"],
+    #tab-fiscal:checked ~ .tabs label[for="tab-fiscal"],
+    #tab-rh:checked ~ .tabs label[for="tab-rh"],
+    #tab-vendas:checked ~ .tabs label[for="tab-vendas"],
+    #tab-marketing:checked ~ .tabs label[for="tab-marketing"],
+    #tab-producao:checked ~ .tabs label[for="tab-producao"],
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
     #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: #12355b; color: white; }
     #tab-dashboard:checked ~ main #dashboard,
@@ -36,6 +43,13 @@
     #tab-dre:checked ~ main #dre,
     #tab-balanco:checked ~ main #balanco,
     #tab-endividamento:checked ~ main #endividamento,
+    #tab-contas-pagar:checked ~ main #contas-pagar,
+    #tab-contas-receber:checked ~ main #contas-receber,
+    #tab-fiscal:checked ~ main #fiscal,
+    #tab-rh:checked ~ main #rh,
+    #tab-vendas:checked ~ main #vendas,
+    #tab-marketing:checked ~ main #marketing,
+    #tab-producao:checked ~ main #producao,
     #tab-mapa:checked ~ main #mapa,
     #tab-acessos:checked ~ main #acessos { display: grid; gap: 16px; }
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
@@ -131,6 +145,13 @@
   <input id="tab-dre" name="tab" type="radio" {% if active_tab == "dre" %}checked{% endif %}>
   <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
   <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
+  <input id="tab-contas-pagar" name="tab" type="radio" {% if active_tab == "contas-pagar" %}checked{% endif %}>
+  <input id="tab-contas-receber" name="tab" type="radio" {% if active_tab == "contas-receber" %}checked{% endif %}>
+  <input id="tab-fiscal" name="tab" type="radio" {% if active_tab == "fiscal" %}checked{% endif %}>
+  <input id="tab-rh" name="tab" type="radio" {% if active_tab == "rh" %}checked{% endif %}>
+  <input id="tab-vendas" name="tab" type="radio" {% if active_tab == "vendas" %}checked{% endif %}>
+  <input id="tab-marketing" name="tab" type="radio" {% if active_tab == "marketing" %}checked{% endif %}>
+  <input id="tab-producao" name="tab" type="radio" {% if active_tab == "producao" %}checked{% endif %}>
   <input id="tab-mapa" name="tab" type="radio" {% if active_tab == "mapa" %}checked{% endif %}>
   <input id="tab-acessos" name="tab" type="radio" {% if active_tab == "acessos" %}checked{% endif %}>
 
@@ -139,6 +160,11 @@
     <label for="tab-financeiro">Financeiro</label>
     <label for="tab-compras">Compras</label>
     <label for="tab-balanco">Balanco</label>
+    <label for="tab-fiscal">Fiscal</label>
+    <label for="tab-rh">RH</label>
+    <label for="tab-vendas">Vendas</label>
+    <label for="tab-marketing">Marketing</label>
+    <label for="tab-producao">Producao</label>
     <label for="tab-mapa">Mapa Empresarial 360</label>
     <label for="tab-acessos">Acessos e Usuarios</label>
   </nav>
@@ -157,9 +183,9 @@
         </div>
       </div>
       <div class="grid">
-        <div class="kpi"><span>Receitas</span><strong>R$ {{ "%.2f"|format(dashboard.receitas) }}</strong></div>
-        <div class="kpi"><span>Despesas</span><strong>R$ {{ "%.2f"|format(dashboard.despesas) }}</strong></div>
-        <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</strong></div>
+        <div class="kpi"><span>Receitas</span><strong>{{ dashboard.receitas|brl }}</strong></div>
+        <div class="kpi"><span>Despesas</span><strong>{{ dashboard.despesas|brl }}</strong></div>
+        <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">{{ dashboard.resultado|brl }}</strong></div>
         <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
       </div>
       <div class="two">
@@ -168,9 +194,9 @@
           <table>
             <tbody>
               <tr><td>Total de lancamentos</td><td>{{ dashboard.total_lancamentos }}</td></tr>
-              <tr><td>Total em compras</td><td>R$ {{ "%.2f"|format(purchases.total) }}</td></tr>
-              <tr><td>Dividas cadastradas</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
-              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.equity) }}</td></tr>
+              <tr><td>Total em compras</td><td>{{ purchases.total|brl }}</td></tr>
+              <tr><td>Dividas cadastradas</td><td>{{ balance.debt_total|brl }}</td></tr>
+              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">{{ balance.equity|brl }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -194,7 +220,7 @@
                 <div class="bar-track"><div class="bar in" style="width: {{ row.entrada_pct }}%"></div></div>
                 <div class="bar-track"><div class="bar out" style="width: {{ row.saida_pct }}%"></div></div>
               </div>
-              <span>R$ {{ "%.0f"|format(row.saldo_mes) }}</span>
+              <span>{{ row.saldo_mes|brl }}</span>
             </div>
             {% endfor %}
           </div>
@@ -207,7 +233,7 @@
             <div class="chart-row">
               <strong>{{ row.group }}</strong>
               <div class="bar-track"><div class="bar group" style="width: {{ row.pct }}%"></div></div>
-              <span>R$ {{ "%.0f"|format(row.value) }}</span>
+              <span>{{ row.value|brl }}</span>
             </div>
             {% endfor %}
           </div>
@@ -216,8 +242,8 @@
           <h2>Endividamento</h2>
           <table>
             <tbody>
-              <tr><td>Capital em aberto</td><td>R$ {{ "%.2f"|format(charts.total_debt) }}</td></tr>
-              <tr><td>Parcelas mensais</td><td>R$ {{ "%.2f"|format(charts.monthly_installments) }}</td></tr>
+              <tr><td>Capital em aberto</td><td>{{ charts.total_debt|brl }}</td></tr>
+              <tr><td>Parcelas mensais</td><td>{{ charts.monthly_installments|brl }}</td></tr>
               <tr><td>Peso sobre receitas</td><td>{% if dashboard.receitas > 0 %}{{ "%.1f"|format((charts.monthly_installments / dashboard.receitas) * 100) }}%{% else %}0.0%{% endif %}</td></tr>
             </tbody>
           </table>
@@ -230,11 +256,11 @@
         <h2>Modulo Financeiro</h2>
         <p>Central financeira do Business360 AI para importar extratos, classificar contas, acompanhar fluxo de caixa, DRE e controlar endividamento.</p>
         <div class="pillar-grid">
-          <div class="pillar"><strong>Receitas</strong><span>R$ {{ "%.2f"|format(dashboard.receitas) }}</span></div>
-          <div class="pillar"><strong>Despesas</strong><span>R$ {{ "%.2f"|format(dashboard.despesas) }}</span></div>
-          <div class="pillar"><strong>Resultado</strong><span>R$ {{ "%.2f"|format(dashboard.resultado) }}</span></div>
+          <div class="pillar"><strong>Receitas</strong><span>{{ dashboard.receitas|brl }}</span></div>
+          <div class="pillar"><strong>Despesas</strong><span>{{ dashboard.despesas|brl }}</span></div>
+          <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
           <div class="pillar"><strong>A classificar</strong><span>{{ dashboard.pendentes }} lancamentos</span></div>
-          <div class="pillar"><strong>Dividas</strong><span>R$ {{ "%.2f"|format(balance.debt_total) }}</span></div>
+          <div class="pillar"><strong>Dividas</strong><span>{{ balance.debt_total|brl }}</span></div>
         </div>
       </div>
 
@@ -246,6 +272,8 @@
           <a class="finance-tab" href="/?tab=fluxo"><span>03</span> Fluxo de Caixa</a>
           <a class="finance-tab" href="/?tab=dre"><span>04</span> DRE</a>
           <a class="finance-tab" href="/?tab=endividamento"><span>05</span> Endividamento</a>
+          <a class="finance-tab" href="/?tab=contas-pagar"><span>06</span> Contas a Pagar</a>
+          <a class="finance-tab" href="/?tab=contas-receber"><span>07</span> Contas a Receber</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
@@ -290,9 +318,9 @@
           <table>
             <tbody>
               <tr><td>Lancamentos sem classificacao</td><td class="{{ 'negative' if dashboard.pendentes > 0 else 'positive' }}">{{ dashboard.pendentes }}</td></tr>
-              <tr><td>Resultado atual</td><td class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">R$ {{ "%.2f"|format(dashboard.resultado) }}</td></tr>
-              <tr><td>Endividamento cadastrado</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
-              <tr><td>Compras classificadas</td><td>R$ {{ "%.2f"|format(purchases.total) }}</td></tr>
+              <tr><td>Resultado atual</td><td class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">{{ dashboard.resultado|brl }}</td></tr>
+              <tr><td>Endividamento cadastrado</td><td>{{ balance.debt_total|brl }}</td></tr>
+              <tr><td>Compras classificadas</td><td>{{ purchases.total|brl }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -375,13 +403,23 @@
       </div>
       <div class="panel">
         <h2>Banco de dados de lancamentos</h2>
+        <form id="bulk-classify-form" action="/transactions/bulk-classify" method="post">
+          <select name="account_id" required>
+            <option value="">Conta para contabilizar selecionados</option>
+            {% for account in accounts %}
+            <option value="{{ account.id }}">{{ account.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Contabilizar selecionados</button>
+        </form>
         <div class="scroll">
           <table>
-            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+            <thead><tr><th>Sel.</th><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
             <tbody>
               {% for row in transactions %}
               {% set is_classified = row.account and row.account.name != "A classificar" %}
               <tr class="{{ 'classified-row' if is_classified else 'pending-row' }}">
+                <td><input form="bulk-classify-form" type="checkbox" name="transaction_ids" value="{{ row.id }}"></td>
                 <td>{{ row.date }}</td>
                 <td>{{ row.history }}</td>
                 <td>{{ row.bank }}</td>
@@ -393,8 +431,8 @@
                   <span class="pill status-pending">Pendente</span>
                   {% endif %}
                 </td>
-                <td>R$ {{ "%.2f"|format(row.entrada) }}</td>
-                <td>R$ {{ "%.2f"|format(row.saida) }}</td>
+                <td>{{ row.entrada|brl }}</td>
+                <td>{{ row.saida|brl }}</td>
                 <td>
                   <form action="/transactions/{{ row.id }}/classify" method="post">
                     <select name="account_id">
@@ -468,7 +506,7 @@
 
     <section id="compras" class="tab">
       <div class="grid">
-        <div class="kpi"><span>Total compras</span><strong>R$ {{ "%.2f"|format(purchases.total) }}</strong></div>
+        <div class="kpi"><span>Total compras</span><strong>{{ purchases.total|brl }}</strong></div>
         <div class="kpi"><span>Lancamentos</span><strong>{{ purchases.count }}</strong></div>
       </div>
       <div class="panel">
@@ -477,10 +515,91 @@
           <thead><tr><th>Data</th><th>Historico</th><th>Conta</th><th>Valor</th></tr></thead>
           <tbody>
             {% for row in purchases.rows %}
-            <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>R$ {{ "%.2f"|format(row.saida) }}</td></tr>
+            <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>{{ row.saida|brl }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="contas-pagar" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="panel hero360">
+        <h2>Contas a Pagar</h2>
+        <p>Base inicial para acompanhar fornecedores, despesas, dividas e compromissos financeiros.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Despesas importadas</strong><span>{{ dashboard.despesas|brl }}</span></div>
+          <div class="pillar"><strong>Compras</strong><span>{{ purchases.total|brl }}</span></div>
+          <div class="pillar"><strong>Dividas ativas</strong><span>{{ balance.debt_total|brl }}</span></div>
+          <div class="pillar"><strong>Parcelas mensais</strong><span>{{ charts.monthly_installments|brl }}</span></div>
+          <div class="pillar"><strong>Status</strong><span>Modulo em implantacao.</span></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Novo titulo a pagar</h2>
+          <form action="/" method="get">
+            <input type="hidden" name="tab" value="contas-pagar">
+            <input type="date" name="due_date">
+            <input name="supplier" placeholder="Fornecedor">
+            <input name="description" placeholder="Descricao">
+            <input type="number" step="0.01" name="amount" placeholder="Valor">
+            <button type="submit">Preparar cadastro</button>
+          </form>
+          <p class="muted">Nesta fase o cadastro prepara a tela. A persistencia completa sera ligada ao banco na proxima evolucao.</p>
+        </div>
+        <div class="panel">
+          <h2>Compromissos financeiros</h2>
+          <table>
+            <thead><tr><th>Credor</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for debt in debts %}
+              <tr><td>{{ debt.creditor }}</td><td>{{ debt.due_date or "" }}</td><td>{{ debt.capital_value|brl }}</td><td>{{ debt.status }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="contas-receber" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="panel hero360">
+        <h2>Contas a Receber</h2>
+        <p>Base inicial para acompanhar clientes, vendas faturadas, recebimentos e previsao de entrada.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Receitas importadas</strong><span>{{ dashboard.receitas|brl }}</span></div>
+          <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
+          <div class="pillar"><strong>Em aberto</strong><span>Cadastro em implantacao</span></div>
+          <div class="pillar"><strong>Recebido</strong><span>{{ dashboard.receitas|brl }}</span></div>
+          <div class="pillar"><strong>Status</strong><span>Modulo em implantacao.</span></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Novo titulo a receber</h2>
+          <form action="/" method="get">
+            <input type="hidden" name="tab" value="contas-receber">
+            <input type="date" name="due_date">
+            <input name="customer" placeholder="Cliente">
+            <input name="description" placeholder="Descricao">
+            <input type="number" step="0.01" name="amount" placeholder="Valor">
+            <button type="submit">Preparar cadastro</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Receitas recentes</h2>
+          <table>
+            <thead><tr><th>Data</th><th>Historico</th><th>Valor</th></tr></thead>
+            <tbody>
+              {% for row in transactions %}
+              {% if row.entrada > 0 %}
+              <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.entrada|brl }}</td></tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -529,7 +648,7 @@
           <thead><tr><th>Linha</th><th>Valor</th></tr></thead>
           <tbody>
             {% for row in dre %}
-            <tr><td>{{ row.line }}</td><td class="{{ 'negative' if row.value < 0 else 'positive' }}">R$ {{ "%.2f"|format(row.value) }}</td></tr>
+            <tr><td>{{ row.line }}</td><td class="{{ 'negative' if row.value < 0 else 'positive' }}">{{ row.value|brl }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -542,8 +661,8 @@
           <h2>Ativo</h2>
           <table>
             <tbody>
-              <tr><td>Caixa e bancos gerencial</td><td class="{{ 'negative' if balance.cash_balance < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.cash_balance) }}</td></tr>
-              <tr><td>Total do ativo</td><td>R$ {{ "%.2f"|format(balance.assets_total) }}</td></tr>
+              <tr><td>Caixa e bancos gerencial</td><td class="{{ 'negative' if balance.cash_balance < 0 else 'positive' }}">{{ balance.cash_balance|brl }}</td></tr>
+              <tr><td>Total do ativo</td><td>{{ balance.assets_total|brl }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -551,8 +670,8 @@
           <h2>Passivo e patrimonio</h2>
           <table>
             <tbody>
-              <tr><td>Endividamento cadastrado</td><td>R$ {{ "%.2f"|format(balance.debt_total) }}</td></tr>
-              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">R$ {{ "%.2f"|format(balance.equity) }}</td></tr>
+              <tr><td>Endividamento cadastrado</td><td>{{ balance.debt_total|brl }}</td></tr>
+              <tr><td>Patrimonio liquido gerencial</td><td class="{{ 'negative' if balance.equity < 0 else 'positive' }}">{{ balance.equity|brl }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -601,9 +720,9 @@
               <td>{{ debt.creditor_type }}</td>
               <td>{{ debt.creditor }}</td>
               <td>{{ debt.description }}</td>
-              <td>R$ {{ "%.2f"|format(debt.capital_value) }}</td>
+              <td>{{ debt.capital_value|brl }}</td>
               <td>{{ "%.2f"|format(debt.monthly_interest_rate) }}% {{ debt.interest_type }}</td>
-              <td>R$ {{ "%.2f"|format(debt.installment_value) }}</td>
+              <td>{{ debt.installment_value|brl }}</td>
               <td>{{ debt.due_day }}</td>
               <td>{{ debt.status }}</td>
               <td><a class="pill" href="/?tab=endividamento&debt_report={{ debt.id }}&debt_months={{ debt_report_months }}">Gerar evolucao</a></td>
@@ -666,10 +785,10 @@
             {% for row in debt_report.rows %}
             <tr>
               <td>{{ row.month }}</td>
-              <td>R$ {{ "%.2f"|format(row.opening_balance) }}</td>
-              <td>R$ {{ "%.2f"|format(row.interest) }}</td>
-              <td>R$ {{ "%.2f"|format(row.installment) }}</td>
-              <td class="{{ 'negative' if row.closing_balance > 0 else 'positive' }}">R$ {{ "%.2f"|format(row.closing_balance) }}</td>
+              <td>{{ row.opening_balance|brl }}</td>
+              <td>{{ row.interest|brl }}</td>
+              <td>{{ row.installment|brl }}</td>
+              <td class="{{ 'negative' if row.closing_balance > 0 else 'positive' }}">{{ row.closing_balance|brl }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -677,6 +796,131 @@
         {% else %}
         <p class="muted">Escolha uma divida para ver a evolucao mensal com juros simples ou compostos.</p>
         {% endif %}
+      </div>
+    </section>
+
+    <section id="fiscal" class="tab">
+      <div class="panel hero360">
+        <h2>Fiscal</h2>
+        <p>Modulo fiscal para importacao de XML, organizacao de notas e integracao futura com apuracao e contabilidade.</p>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Leitor e importador de XML</h2>
+          <form action="/fiscal/import-xml" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".xml" required>
+            <button type="submit">Importar XML</button>
+          </form>
+          {% if request.query_params.get("xml_ok") %}
+          <p class="positive">XML lido com sucesso: {{ request.query_params.get("xml") }}</p>
+          {% endif %}
+          {% if request.query_params.get("xml_erro") %}
+          <p class="negative">Nao foi possivel ler o XML: {{ request.query_params.get("xml") }}</p>
+          {% endif %}
+        </div>
+        <div class="panel">
+          <h2>Controles fiscais planejados</h2>
+          <div class="module-grid">
+            <div class="module-card"><strong>NF-e</strong><span>Entrada, saida, chave de acesso e fornecedor/cliente.</span></div>
+            <div class="module-card"><strong>NFS-e</strong><span>Servicos tomados e prestados.</span></div>
+            <div class="module-card"><strong>Impostos</strong><span>Simples Nacional, DAS, guias e vencimentos.</span></div>
+            <div class="module-card"><strong>Contabilidade</strong><span>Exportacao e integracao contabil.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rh" class="tab">
+      <div class="panel hero360">
+        <h2>RH</h2>
+        <p>Modulo de pessoas para colaboradores, EPIs, exames, treinamentos, ponto, ferias, atestados e custos trabalhistas.</p>
+      </div>
+      <div class="module-grid">
+        <div class="module-card"><strong>Cadastro do colaborador</strong><span>Nome, cargo, admissao, documentos e status.</span><input placeholder="Nome do colaborador"><input placeholder="Cargo"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Cadastro de EPI</strong><span>Controle de entrega, CA, validade e devolucao.</span><input placeholder="EPI"><input type="date"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Exames periodicos</strong><span>ASO, vencimentos e alertas de renovacao.</span><input placeholder="Tipo de exame"><input type="date"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Treinamentos</strong><span>NRs, integracao, reciclagens e comprovantes.</span><input placeholder="Treinamento"><input type="date"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Descritivo de funcao</strong><span>Responsabilidades, requisitos e riscos do cargo.</span><input placeholder="Funcao"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Cartao ponto</strong><span>Entradas, saidas, extras, faltas e banco de horas.</span><input type="date"><input placeholder="Horas"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Controle de ferias</strong><span>Periodo aquisitivo, gozo, abono e saldo.</span><input placeholder="Colaborador"><input type="date"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Controle de atestados</strong><span>CID, periodo, documento e impacto no ponto.</span><input placeholder="Colaborador"><input type="date"><button>Preparar cadastro</button></div>
+        <div class="module-card"><strong>Salarios e custos</strong><span>Salario, encargos, beneficios e custo total empresa.</span><input placeholder="Salario"><input placeholder="Custo total"><button>Preparar cadastro</button></div>
+      </div>
+    </section>
+
+    <section id="vendas" class="tab">
+      <div class="panel hero360">
+        <h2>Vendas</h2>
+        <p>Modulo comercial para produtos, clientes, pedidos, margem e relacionamento.</p>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Cadastro de produto</h2>
+          <form action="/" method="get">
+            <input type="hidden" name="tab" value="vendas">
+            <input name="sku" placeholder="Codigo/SKU">
+            <input name="product" placeholder="Produto">
+            <input type="number" step="0.01" name="price" placeholder="Preco de venda">
+            <button type="submit">Preparar cadastro</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Cadastro de cliente</h2>
+          <form action="/" method="get">
+            <input type="hidden" name="tab" value="vendas">
+            <input name="customer" placeholder="Cliente">
+            <input name="document" placeholder="CPF/CNPJ">
+            <input name="phone" placeholder="Telefone">
+            <button type="submit">Preparar cadastro</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="marketing" class="tab">
+      <div class="panel hero360">
+        <h2>Marketing</h2>
+        <p>Planejamento comercial e acompanhamento de investimento, retorno, ROI e CAC.</p>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Calendario de marketing</h2>
+          <form action="/" method="get">
+            <input type="hidden" name="tab" value="marketing">
+            <input type="date" name="campaign_date">
+            <input name="campaign" placeholder="Campanha">
+            <input name="channel" placeholder="Canal">
+            <button type="submit">Adicionar ao planejamento</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>ROI e CAC</h2>
+          <table>
+            <tbody>
+              <tr><td>Investimento</td><td><input type="number" step="0.01" placeholder="R$"></td></tr>
+              <tr><td>Retorno</td><td><input type="number" step="0.01" placeholder="R$"></td></tr>
+              <tr><td>Novos clientes</td><td><input type="number" placeholder="Quantidade"></td></tr>
+              <tr><td>Indicadores</td><td>ROI e CAC serao calculados na proxima evolucao com banco de dados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="producao" class="tab">
+      <div class="panel hero360">
+        <h2>Producao</h2>
+        <p>Modulo de producao com foco em PCP, planejamento, capacidade, ordens e acompanhamento de etapas.</p>
+      </div>
+      <div class="panel">
+        <h2>PCP - Planejamento e Controle da Producao</h2>
+        <div class="module-grid">
+          <div class="module-card"><strong>Pedido</strong><span>Entrada da demanda e prioridade.</span><input placeholder="Pedido"><button>Preparar</button></div>
+          <div class="module-card"><strong>Planejamento</strong><span>Data prometida, recursos e materiais.</span><input type="date"><button>Preparar</button></div>
+          <div class="module-card"><strong>Producao</strong><span>Etapa atual, responsavel e apontamento.</span><input placeholder="Etapa"><button>Preparar</button></div>
+          <div class="module-card"><strong>Qualidade</strong><span>Inspecao e nao conformidades.</span><input placeholder="Checklist"><button>Preparar</button></div>
+          <div class="module-card"><strong>Entrega</strong><span>Expedicao, prazo e status final.</span><input type="date"><button>Preparar</button></div>
+        </div>
       </div>
     </section>
 

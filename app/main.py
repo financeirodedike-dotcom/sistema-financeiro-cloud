@@ -1,5 +1,6 @@
 import hashlib
 from datetime import date
+from xml.etree import ElementTree
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -33,19 +34,84 @@ templates.env.filters["brl"] = format_brl
 
 DEFAULT_ACCOUNTS = [
     ("A classificar", "Outras", "Outras Receitas/Despesas", "Operacional"),
-    ("Venda a vista", "Receitas", "Receita Bruta", "Operacional"),
-    ("Venda a prazo antecipadas", "Receitas", "Receita Bruta", "Operacional"),
-    ("Materia prima", "Custos e Compras", "Custos e Compras", "Operacional"),
-    ("Material de consumo", "Custos e Compras", "Custos e Compras", "Operacional"),
-    ("Frete compras", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("VENDA A VISTA", "Receitas", "Receita Bruta", "Operacional"),
+    ("VENDA A PRAZO ANTECIPADAS", "Receitas", "Receita Bruta", "Operacional"),
+    ("VENDAS REFORMA", "Receitas", "Receita Bruta", "Operacional"),
+    ("VENDA DE SERVIÇO", "Receitas", "Receita Bruta", "Operacional"),
+    ("VENDA DE SUCATA", "Receitas", "Receita Bruta", "Operacional"),
+    ("VENDA IMOBILIZADO", "Receitas", "Outras Receitas", "Investimento"),
+    ("MATÉRIA PRIMA", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("MATERIAL DE CONSUMO", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("ALUGUEL DO IMÓVEL", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("ENERGIA ELETRICA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("AGUA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("TELEFONIA MOVEL", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("INTERNET", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("LOCAÇÃO DE SOFTWAE", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("HONORARIOS ADVOCATÍCIOS", "Serviços", "Despesas Operacionais", "Operacional"),
+    ("HONORÁRIOS CONTÁBEIS", "Serviços", "Despesas Operacionais", "Operacional"),
+    ("COMBUSTIVEIS", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("PEDÁGIO", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("MANUTENÇÃO DE VEICULOS", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("SEGUROS DE VEÍCULOS", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("IPVA", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("LICENCIAMENTO ANUAL", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("FINANCIAMENTO STRADA", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("MATÉRIAL DE ESCRITÓRIO", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("MATÉRIAL DE LIMPEZA", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("DIARISTA / LIMPEZA", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("ALIMENTAÇÃO/ MERCADO", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("FRETE COMPRAS", "Custos e Compras", "Custos e Compras", "Operacional"),
+    ("MANUTENÇÃO EMPRESA", "Manutenção", "Despesas Operacionais", "Operacional"),
+    ("MANUTENÇÃO MAQUINAS E EQUIPAMENTOS", "Manutenção", "Despesas Operacionais", "Operacional"),
+    ("MOVEIS E UTENSILIOS", "Investimentos", "Investimentos", "Investimento"),
+    ("ESTACIONAMENTO", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("SERASA", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("HOSPEDAGEM SITE", "Marketing", "Despesas Operacionais", "Operacional"),
+    ("CERTIFICADO DIGITAL", "Fiscal", "Despesas Operacionais", "Operacional"),
+    ("ROSELI FAUSTIN", "Outras", "Outras Receitas/Despesas", "Operacional"),
+    ("FERRAMENTAS", "Investimentos", "Investimentos", "Investimento"),
+    ("EQUIPAMENTOS DE T.I.", "Investimentos", "Investimentos", "Investimento"),
+    ("MARKETING", "Marketing", "Despesas Comerciais", "Operacional"),
+    ("COMISSAO", "Comercial", "Despesas Comerciais", "Operacional"),
+    ("FRETE VENDAS", "Comercial", "Despesas Comerciais", "Operacional"),
+    ("SIMPLES NACIONAL DAS", "Fiscal", "Impostos", "Operacional"),
+    ("SERVIÇOS TERCEIRIZADOS", "Serviços", "Despesas Operacionais", "Operacional"),
     ("SALARIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
-    ("Aluguel do imovel", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("Energia eletrica", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("Combustiveis", "Operacional", "Despesas Operacionais", "Operacional"),
-    ("Pedagio", "Operacional", "Despesas Operacionais", "Operacional"),
-    ("Tarifas Bancarias", "Financeiro", "Resultado Financeiro", "Financiamento"),
-    ("Juros por atraso", "Financeiro", "Resultado Financeiro", "Financiamento"),
-    ("Transferencia entre contas", "Transferencias", "Transferencias", "Transferencia"),
+    ("DESPESA AJUDA DE CUSTO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA VALE COMPRA/TRANSPORTE", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("HORAS EXTRAS", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("13 SALARIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("FÉRIAS FUNCIONÁRIOS", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA RESCISÃO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA MULTA RECISÃO 40% FGTS", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA ASSISTÊNCIA MÉDICA / PLANO DE SAÚDE", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("FARMÁCIA", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("INSS", "Pessoal", "Encargos sobre Folha", "Operacional"),
+    ("FGTS", "Pessoal", "Encargos sobre Folha", "Operacional"),
+    ("DESPESA IRRF SALÁRIOS", "Pessoal", "Encargos sobre Folha", "Operacional"),
+    ("DESPESA UNIFORMES", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA MEDICINA OCUPACIONAL", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("EPI", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA BONUS PONTUALIDADE", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA ENDOMARKETING", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DEPOSITO JUDICIAL TRABALHISTA", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("CLARA JAILMA M T COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
+    ("ANDRÉ LUIS DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
+    ("ALTAMIR DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
+    ("RODRIGO JOSÉ DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
+    ("LUIZ HENRIQUE DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
+    ("TARIFAS BANCÁRIAS", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("BORDÊRO", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("JUROS ANTECIPAÇÕES DE TITULOS", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("JUROS POR ATRASO", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("JUROS LIMITE", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("JUROS EMPRÉSTIMOS", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("TAXA CARTÃO CRÉDITO/DÉBITO", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("IOF", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("ROTATIVO CRESOL", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("TARIFA FLAT BB", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("TRANSFERENCIA ENTRE CONTAS", "Transferencias", "Transferencias", "Transferencia"),
 ]
 
 BANK_SOURCES = [
@@ -76,15 +142,45 @@ def debt_overdue_days(debt: Debt) -> int:
     return max((date.today() - debt.due_date).days, 0)
 
 
+def normalize_account_name(name: str) -> str:
+    return " ".join(name.strip().upper().split())
+
+
 def seed_company_accounts(db: Session, company: Company) -> None:
-    existing = db.scalar(select(FinancialAccount).where(FinancialAccount.company_id == company.id).limit(1))
-    if existing:
-        return
+    existing_accounts = db.scalars(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.id)
+    ).all()
+    by_name = {}
+    duplicates_found = False
+    for account in existing_accounts:
+        normalized = normalize_account_name(account.name)
+        if normalized in by_name:
+            keeper = by_name[normalized]
+            for transaction in db.scalars(
+                select(Transaction).where(Transaction.company_id == company.id, Transaction.account_id == account.id)
+            ).all():
+                transaction.account_id = keeper.id
+            account.name = f"REMOVER DUPLICADA {account.id}"
+            db.delete(account)
+            duplicates_found = True
+            continue
+        by_name[normalized] = account
+    if duplicates_found:
+        db.flush()
+    for normalized, account in by_name.items():
+        account.name = normalized
     for name, group, dre_line, cashflow in DEFAULT_ACCOUNTS:
+        normalized = normalize_account_name(name)
+        if normalized in by_name:
+            account = by_name[normalized]
+            account.group_name = group
+            account.dre_line = dre_line
+            account.cashflow_class = cashflow
+            continue
         db.add(
             FinancialAccount(
                 company_id=company.id,
-                name=name,
+                name=normalized,
                 group_name=group,
                 dre_line=dre_line,
                 cashflow_class=cashflow,
@@ -389,9 +485,8 @@ def create_account(
     if isinstance(context, RedirectResponse):
         return context
     _user, company = context
-    existing = db.scalar(
-        select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.name == name.strip())
-    )
+    clean_name = normalize_account_name(name)
+    existing = db.scalar(select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.name == clean_name))
     if existing:
         existing.group_name = group_name
         existing.dre_line = dre_line
@@ -400,7 +495,7 @@ def create_account(
         db.add(
             FinancialAccount(
                 company_id=company.id,
-                name=name.strip(),
+                name=clean_name,
                 group_name=group_name,
                 dre_line=dre_line,
                 cashflow_class=cashflow_class,
@@ -495,7 +590,7 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
             db.commit()
         except IntegrityError:
             db.rollback()
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/?tab=classificacao", status_code=303)
 
 
 @app.post("/debts")
@@ -535,7 +630,7 @@ def create_debt(
         )
     )
     db.commit()
-    return RedirectResponse("/#endividamento", status_code=303)
+    return RedirectResponse("/?tab=endividamento", status_code=303)
 
 
 @app.post("/debts/{debt_id}/update")
@@ -575,7 +670,46 @@ def update_debt(
         debt.status = status
         debt.notes = notes.strip()
         db.commit()
-    return RedirectResponse("/#endividamento", status_code=303)
+    return RedirectResponse("/?tab=endividamento", status_code=303)
+
+
+@app.post("/transactions/bulk-classify")
+def bulk_classify_transactions(
+    request: Request,
+    transaction_ids: list[int] = Form([]),
+    account_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    account = db.scalar(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
+    )
+    if account and transaction_ids:
+        rows = db.scalars(
+            select(Transaction).where(Transaction.company_id == company.id, Transaction.id.in_(transaction_ids))
+        ).all()
+        for row in rows:
+            row.account_id = account.id
+        db.commit()
+    return RedirectResponse("/?tab=extratos", status_code=303)
+
+
+@app.post("/fiscal/import-xml")
+async def import_fiscal_xml(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    content = await file.read()
+    status = "xml_ok"
+    try:
+        ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        status = "xml_erro"
+    filename = file.filename or "arquivo.xml"
+    return RedirectResponse(f"/?tab=fiscal&{status}=1&xml={filename}", status_code=303)
 
 
 @app.post("/transactions/{transaction_id}/classify")
