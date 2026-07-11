@@ -125,6 +125,21 @@ class BalanceAdjustment(Base):
     company: Mapped[Company] = relationship()
 
 
+class CashflowPlan(Base):
+    __tablename__ = "cashflow_plans"
+    __table_args__ = (UniqueConstraint("company_id", "month", name="uq_cashflow_plan_company_month"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    planned_inflows: Mapped[float] = mapped_column(Float, default=0)
+    planned_outflows: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class Debt(Base):
     __tablename__ = "debts"
 

@@ -1,9 +1,10 @@
 from collections import defaultdict
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Debt, FinancialAccount, Transaction
+from app.models import CashflowPlan, Debt, FinancialAccount, Transaction
 
 
 def dashboard(db: Session, company_id: int) -> dict:
@@ -45,6 +46,45 @@ def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
             }
         )
     return output
+
+
+def planned_cashflow(db: Session, company_id: int) -> dict:
+    actual_rows = monthly_cashflow(db, company_id)
+    actual_by_month = {row["month"]: row for row in actual_rows}
+    plans = db.scalars(
+        select(CashflowPlan).where(CashflowPlan.company_id == company_id).order_by(CashflowPlan.month.desc())
+    ).all()
+    plan_by_month = {row.month: row for row in plans}
+    months = sorted(set(actual_by_month) | set(plan_by_month), reverse=True)
+    rows = []
+    for month in months[:18]:
+        actual = actual_by_month.get(month, {"entradas": 0, "saidas": 0, "saldo_mes": 0})
+        plan = plan_by_month.get(month)
+        planned_inflows = plan.planned_inflows if plan else 0
+        planned_outflows = plan.planned_outflows if plan else 0
+        planned_balance = planned_inflows - planned_outflows
+        actual_balance = actual["saldo_mes"]
+        rows.append(
+            {
+                "month": month,
+                "planned_inflows": planned_inflows,
+                "planned_outflows": planned_outflows,
+                "planned_balance": planned_balance,
+                "actual_inflows": actual["entradas"],
+                "actual_outflows": actual["saidas"],
+                "actual_balance": actual_balance,
+                "variance": actual_balance - planned_balance,
+                "notes": plan.notes if plan else "",
+            }
+        )
+    totals = {
+        "planned_inflows": sum(row["planned_inflows"] for row in rows),
+        "planned_outflows": sum(row["planned_outflows"] for row in rows),
+        "planned_balance": sum(row["planned_balance"] for row in rows),
+        "actual_balance": sum(row["actual_balance"] for row in rows),
+        "variance": sum(row["variance"] for row in rows),
+    }
+    return {"rows": rows, "totals": totals}
 
 
 def dre(db: Session, company_id: int) -> list[dict]:
@@ -115,7 +155,7 @@ def balance_sheet(db: Session, company_id: int) -> dict:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     debts = db.scalars(select(Debt).where(Debt.company_id == company_id, Debt.status == "Ativo")).all()
     cash_balance = sum(row.entrada - row.saida for row in rows)
-    debt_total = sum(row.capital_value for row in debts)
+    debt_total = sum(current_debt_position(row)["current_balance"] for row in debts)
     equity = cash_balance - debt_total
     return {
         "cash_balance": cash_balance,
@@ -152,7 +192,7 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
     ]
 
     debts = db.scalars(select(Debt).where(Debt.company_id == company_id, Debt.status == "Ativo")).all()
-    total_debt = sum(row.capital_value for row in debts)
+    total_debt = sum(current_debt_position(row)["current_balance"] for row in debts)
     monthly_installments = sum(row.installment_value for row in debts)
     return {
         "flow_rows": flow_rows,
@@ -190,3 +230,50 @@ def debt_evolution(debt: Debt | None, months: int = 12) -> dict:
             }
         )
     return {"debt": debt, "rows": rows, "months": months}
+
+
+def debt_months_elapsed(debt: Debt, reference_date: date | None = None) -> int:
+    reference_date = reference_date or date.today()
+    start_date = debt.debt_date or debt.due_date
+    if not start_date or reference_date <= start_date:
+        return 0
+    months = (reference_date.year - start_date.year) * 12 + (reference_date.month - start_date.month)
+    if reference_date.day >= start_date.day:
+        months += 1
+    return max(months, 0)
+
+
+def current_debt_position(debt: Debt, reference_date: date | None = None) -> dict:
+    reference_date = reference_date or date.today()
+    if debt.status != "Ativo":
+        return {
+            "months_elapsed": 0,
+            "interest_total": 0,
+            "paid_total": 0,
+            "current_balance": 0,
+            "reference_date": reference_date,
+        }
+
+    months = debt_months_elapsed(debt, reference_date)
+    capital = debt.capital_value or 0
+    rate = (debt.monthly_interest_rate or 0) / 100
+    installment = debt.installment_value or 0
+    balance = capital
+    interest_total = 0
+    paid_total = 0
+
+    for _month in range(months):
+        opening_balance = balance
+        interest = capital * rate if debt.interest_type == "Simples" else opening_balance * rate
+        payment = min(installment, opening_balance + interest) if installment > 0 else 0
+        balance = max(opening_balance + interest - payment, 0)
+        interest_total += interest
+        paid_total += payment
+
+    return {
+        "months_elapsed": months,
+        "interest_total": interest_total,
+        "paid_total": paid_total,
+        "current_balance": balance,
+        "reference_date": reference_date,
+    }

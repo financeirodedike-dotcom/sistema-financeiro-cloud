@@ -1,6 +1,6 @@
 import hashlib
 import unicodedata
-from datetime import date
+from datetime import date, datetime
 from xml.etree import ElementTree
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.models import Anticipation, CashflowPlan, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import balance_sheet, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, purchases
+from app.reports import balance_sheet, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
 app = FastAPI(title="Business360 AI")
@@ -342,7 +342,10 @@ def home(request: Request, db: Session = Depends(get_db)):
         (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value
         for row in anticipations
     )
-    debt_rows = [{"debt": debt, "overdue_days": debt_overdue_days(debt)} for debt in debts]
+    debt_rows = [
+        {"debt": debt, "overdue_days": debt_overdue_days(debt), "position": current_debt_position(debt)}
+        for debt in debts
+    ]
     purchases_report = purchases(db, company.id)
     report_debt_id = request.query_params.get("debt_report")
     report_months_raw = request.query_params.get("debt_months", "12")
@@ -413,6 +416,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "cashflow": cashflow_report,
             "cashflow_totals": cashflow_totals,
             "cashflow_explanation": cashflow_explanation,
+            "planned_cashflow": planned_cashflow(db, company.id),
             "dre": dre(db, company.id),
             "balance": balance_sheet(db, company.id),
             "purchases": purchases_report,
@@ -720,6 +724,42 @@ def update_debt(
         debt.notes = notes.strip()
         db.commit()
     return RedirectResponse("/?tab=endividamento", status_code=303)
+
+
+@app.post("/cashflow-plans")
+def save_cashflow_plan(
+    request: Request,
+    month: str = Form(...),
+    planned_inflows: float = Form(0),
+    planned_outflows: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    clean_month = month[:7]
+    if len(clean_month) != 7:
+        return RedirectResponse("/?tab=caixa-planejado", status_code=303)
+    plan = db.scalar(select(CashflowPlan).where(CashflowPlan.company_id == company.id, CashflowPlan.month == clean_month))
+    if plan:
+        plan.planned_inflows = planned_inflows
+        plan.planned_outflows = planned_outflows
+        plan.notes = notes.strip()
+        plan.updated_at = datetime.utcnow()
+    else:
+        db.add(
+            CashflowPlan(
+                company_id=company.id,
+                month=clean_month,
+                planned_inflows=planned_inflows,
+                planned_outflows=planned_outflows,
+                notes=notes.strip(),
+            )
+        )
+    db.commit()
+    return RedirectResponse("/?tab=caixa-planejado", status_code=303)
 
 
 @app.post("/transactions/bulk-classify")
