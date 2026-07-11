@@ -5,15 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Business360 AI</title>
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #f5f7fb; color: #172033; }
-    header { background: linear-gradient(120deg, #061522, #12355b 58%, #0c8ec4); color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    :root { --navy: #0b2742; --blue: #12355b; --teal: #0f766e; --line: #d8dee9; --soft: #f6f8fb; --text: #172033; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: linear-gradient(180deg, #f7faff 0%, #edf2f8 100%); color: var(--text); }
+    header { background: linear-gradient(120deg, #061522, #12355b 58%, #0c8ec4); color: white; padding: 16px 24px; display: flex; justify-content: space-between; gap: 16px; align-items: center; box-shadow: 0 12px 30px rgba(6,21,34,.18); }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28); font-weight: 900; font-size: 18px; }
     header h1 { margin: 0; font-size: 24px; }
     header small { display: block; margin-top: 4px; color: #d9e6f2; }
-    main { padding: 16px; display: grid; gap: 16px; }
-    .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; background: #eaf0f7; border-bottom: 1px solid #d8dee9; padding: 8px 12px; }
-    .tabs label { padding: 10px 12px; border-radius: 6px; color: #12355b; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    main { padding: 18px; display: grid; gap: 16px; }
+    .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; overflow-x: auto; background: rgba(234,240,247,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding: 10px 14px; }
+    .tabs label { padding: 10px 13px; border-radius: 8px; color: var(--blue); font-weight: 800; cursor: pointer; white-space: nowrap; }
     input[name="tab"] { display: none; }
     .tab { display: none; }
     #tab-dashboard:checked ~ .tabs label[for="tab-dashboard"],
@@ -33,7 +35,8 @@
     #tab-marketing:checked ~ .tabs label[for="tab-marketing"],
     #tab-producao:checked ~ .tabs label[for="tab-producao"],
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
-    #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: #12355b; color: white; }
+    #tab-antecipacoes:checked ~ .tabs label[for="tab-antecipacoes"],
+    #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: var(--blue); color: white; box-shadow: 0 8px 20px rgba(18,53,91,.18); }
     #tab-dashboard:checked ~ main #dashboard,
     #tab-financeiro:checked ~ main #financeiro,
     #tab-extratos:checked ~ main #extratos,
@@ -45,6 +48,7 @@
     #tab-endividamento:checked ~ main #endividamento,
     #tab-contas-pagar:checked ~ main #contas-pagar,
     #tab-contas-receber:checked ~ main #contas-receber,
+    #tab-antecipacoes:checked ~ main #antecipacoes,
     #tab-fiscal:checked ~ main #fiscal,
     #tab-rh:checked ~ main #rh,
     #tab-vendas:checked ~ main #vendas,
@@ -55,12 +59,12 @@
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .three { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .panel, .kpi { background: white; border: 1px solid #d8dee9; border-radius: 8px; padding: 14px; }
+    .panel, .kpi { background: rgba(255,255,255,.96); border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 8px 22px rgba(18,53,91,.06); }
     .kpi span { color: #667085; font-size: 12px; font-weight: 700; text-transform: uppercase; }
     .kpi strong { display: block; margin-top: 6px; font-size: 24px; }
     h2 { margin: 0 0 12px; color: #12355b; font-size: 17px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: #12355b; color: white; text-align: left; }
+    th { background: var(--blue); color: white; text-align: left; }
     th, td { padding: 8px; border-bottom: 1px solid #d8dee9; vertical-align: middle; }
     tfoot td { background: #eef4f8; font-weight: 800; }
     tr:nth-child(even) { background: #f8fbff; }
@@ -68,8 +72,8 @@
     tr.pending-row { background: #fff8e6; }
     tr.classified-row:nth-child(even) { background: #dcfce7; }
     tr.pending-row:nth-child(even) { background: #fff1c2; }
-    input, select, button { padding: 9px 10px; border: 1px solid #d8dee9; border-radius: 6px; }
-    button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
+    input, select, button { padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; }
+    button { background: var(--teal); color: white; font-weight: 800; cursor: pointer; border: 0; box-shadow: 0 8px 18px rgba(15,118,110,.16); }
     .logout button { background: #ffffff; color: #12355b; border: 0; }
     form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
     .negative { color: #c1121f; font-weight: 700; }
@@ -81,7 +85,7 @@
     .class-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .class-tabs button { background: #eef4f8; color: #12355b; border: 1px solid #cbd6e2; }
     .class-tabs button:hover { background: #12355b; color: white; }
-    .hero360 { background: #071827; color: white; border-color: #12355b; }
+    .hero360 { background: linear-gradient(135deg, #071827, #12355b); color: white; border-color: #12355b; }
     .hero360 h2 { color: #4cc9f0; }
     .pillar-grid, .module-grid, .roadmap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
     .pillar, .module-card, .roadmap-card { border: 1px solid #cbd6e2; border-radius: 8px; padding: 12px; background: white; }
@@ -96,6 +100,10 @@
     .finance-tab span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: rgba(15,118,110,.12); font-size: 12px; }
     .status-ok { color: #157347; background: #dcfce7; border-color: #bbf7d0; }
     .status-pending { color: #9a6700; background: #fff8e6; border-color: #fde68a; }
+    .insight { border-left: 4px solid #0f766e; background: #f0fdfa; }
+    .money-formula { font-size: 18px; font-weight: 900; color: #12355b; }
+    .classified-card { border-color: #bbf7d0; background: #f0fdf4; }
+    .pending-card { border-color: #fde68a; background: #fffbeb; }
     .score-list { display: grid; gap: 8px; }
     .score-row { display: grid; grid-template-columns: 120px 1fr 42px; gap: 10px; align-items: center; font-size: 13px; }
     .score-track { height: 10px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
@@ -147,6 +155,7 @@
   <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
   <input id="tab-contas-pagar" name="tab" type="radio" {% if active_tab == "contas-pagar" %}checked{% endif %}>
   <input id="tab-contas-receber" name="tab" type="radio" {% if active_tab == "contas-receber" %}checked{% endif %}>
+  <input id="tab-antecipacoes" name="tab" type="radio" {% if active_tab == "antecipacoes" %}checked{% endif %}>
   <input id="tab-fiscal" name="tab" type="radio" {% if active_tab == "fiscal" %}checked{% endif %}>
   <input id="tab-rh" name="tab" type="radio" {% if active_tab == "rh" %}checked{% endif %}>
   <input id="tab-vendas" name="tab" type="radio" {% if active_tab == "vendas" %}checked{% endif %}>
@@ -187,6 +196,11 @@
         <div class="kpi"><span>Despesas</span><strong>{{ dashboard.despesas|brl }}</strong></div>
         <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">{{ dashboard.resultado|brl }}</strong></div>
         <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
+      </div>
+      <div class="panel insight">
+        <h2>Leitura rapida do caixa</h2>
+        <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
+        <p class="muted">{{ cashflow_explanation }} Para investigar, entre em Financeiro > Fluxo de Caixa e compare os meses com maior saida.</p>
       </div>
       <div class="two">
         <div class="panel">
@@ -274,6 +288,7 @@
           <a class="finance-tab" href="/?tab=endividamento"><span>05</span> Endividamento</a>
           <a class="finance-tab" href="/?tab=contas-pagar"><span>06</span> Contas a Pagar</a>
           <a class="finance-tab" href="/?tab=contas-receber"><span>07</span> Contas a Receber</a>
+          <a class="finance-tab" href="/?tab=antecipacoes"><span>08</span> Antecipacoes</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
@@ -297,6 +312,19 @@
             <strong>Endividamento</strong>
             <span>Controle dividas, juros simples ou compostos, vencimentos, dias em atraso e evolucao mensal.</span>
           </a>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel classified-card">
+          <h2>Lancamentos classificados</h2>
+          <strong>{{ classified_count }}</strong>
+          <p class="muted">Linhas verdes nos extratos: ja foram contabilizadas em uma conta financeira.</p>
+        </div>
+        <div class="panel pending-card">
+          <h2>Pendentes de classificacao</h2>
+          <strong>{{ pending_count }}</strong>
+          <p class="muted">Linhas amarelas nos extratos: ainda precisam de conta financeira.</p>
         </div>
       </div>
 
@@ -417,7 +445,7 @@
             <thead><tr><th>Sel.</th><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
             <tbody>
               {% for row in transactions %}
-              {% set is_classified = row.account and row.account.name != "A classificar" %}
+              {% set is_classified = row.account and row.account.name.upper() != "A CLASSIFICAR" %}
               <tr class="{{ 'classified-row' if is_classified else 'pending-row' }}">
                 <td><input form="bulk-classify-form" type="checkbox" name="transaction_ids" value="{{ row.id }}"></td>
                 <td>{{ row.date }}</td>
@@ -603,6 +631,70 @@
       </div>
     </section>
 
+    <section id="antecipacoes" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="panel hero360">
+        <h2>Antecipacoes</h2>
+        <p>Controle as antecipacoes de titulos por empresa ou pessoa fisica, com taxa dos titulos, juros, IOF, custas e valor liquido estimado.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Total de titulos</strong><span>{{ anticipation_summary.title_total|brl }}</span></div>
+          <div class="pillar"><strong>Custos estimados</strong><span>{{ anticipation_summary.cost_total|brl }}</span></div>
+          <div class="pillar"><strong>Liquido estimado</strong><span>{{ anticipation_summary.net_total|brl }}</span></div>
+          <div class="pillar"><strong>Operacoes</strong><span>{{ anticipations|length }}</span></div>
+          <div class="pillar"><strong>Uso</strong><span>Analise custo antes de antecipar.</span></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Nova antecipacao</h2>
+          <form action="/anticipations" method="post">
+            <input name="anticipation_date" type="date" title="Data">
+            <input name="counterparty" placeholder="Empresa ou pessoa fisica" required>
+            <select name="counterparty_type">
+              <option value="Empresa">Empresa</option>
+              <option value="Pessoa Fisica">Pessoa Fisica</option>
+              <option value="Banco">Banco</option>
+              <option value="Factor">Factor</option>
+            </select>
+            <input name="title_value" type="number" step="0.01" placeholder="Valor dos titulos">
+            <input name="title_fee_rate" type="number" step="0.01" placeholder="Taxa dos titulos %">
+            <input name="interest_rate" type="number" step="0.01" placeholder="Taxa de juros %">
+            <input name="iof_value" type="number" step="0.01" placeholder="IOF">
+            <input name="costs_value" type="number" step="0.01" placeholder="Custas">
+            <input name="notes" placeholder="Observacoes">
+            <button type="submit">Salvar antecipacao</button>
+          </form>
+        </div>
+        <div class="panel insight">
+          <h2>Como ler a antecipacao</h2>
+          <p class="muted">O custo estimado considera taxa dos titulos + taxa de juros + IOF + custas. O liquido estimado e o valor dos titulos menos esses custos.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Historico de antecipacoes</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Empresa/Pessoa</th><th>Tipo</th><th>Titulos</th><th>Taxa titulos</th><th>Juros</th><th>IOF</th><th>Custas</th><th>Custo total</th><th>Liquido</th></tr></thead>
+          <tbody>
+            {% for row in anticipations %}
+            {% set total_cost = (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value %}
+            <tr>
+              <td>{{ row.anticipation_date or "" }}</td>
+              <td>{{ row.counterparty }}</td>
+              <td>{{ row.counterparty_type }}</td>
+              <td>{{ row.title_value|brl }}</td>
+              <td>{{ "%.2f"|format(row.title_fee_rate) }}%</td>
+              <td>{{ "%.2f"|format(row.interest_rate) }}%</td>
+              <td>{{ row.iof_value|brl }}</td>
+              <td>{{ row.costs_value|brl }}</td>
+              <td class="negative">{{ total_cost|brl }}</td>
+              <td class="{{ 'negative' if (row.title_value - total_cost) < 0 else 'positive' }}">{{ (row.title_value - total_cost)|brl }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="fluxo" class="tab">
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel">
@@ -612,6 +704,11 @@
           <div class="kpi"><span>Total de saidas</span><strong>{{ cashflow_totals.saidas|brl }}</strong></div>
           <div class="kpi"><span>Saldo do periodo</span><strong class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</strong></div>
           <div class="kpi"><span>Saldo acumulado</span><strong class="{{ 'negative' if cashflow_totals.saldo_acumulado < 0 else 'positive' }}">{{ cashflow_totals.saldo_acumulado|brl }}</strong></div>
+        </div>
+        <div class="panel insight">
+          <h2>Por que existe diferenca?</h2>
+          <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
+          <p class="muted">{{ cashflow_explanation }} Essa diferenca e o saldo do periodo. O saldo acumulado soma o resultado de todos os meses exibidos.</p>
         </div>
         <p class="muted">Valores em padrao financeiro brasileiro: R$ 1.234,56.</p>
         <table>

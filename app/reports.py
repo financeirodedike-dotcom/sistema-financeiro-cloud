@@ -10,7 +10,7 @@ def dashboard(db: Session, company_id: int) -> dict:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     receitas = sum(row.entrada for row in rows)
     despesas = sum(row.saida for row in rows)
-    pendentes = sum(1 for row in rows if not row.account or row.account.name == "A classificar")
+    pendentes = sum(1 for row in rows if not row.account or row.account.name.upper() == "A CLASSIFICAR")
     return {
         "receitas": receitas,
         "despesas": despesas,

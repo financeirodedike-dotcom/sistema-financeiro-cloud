@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.models import Anticipation, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
 from app.reports import balance_sheet, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, purchases
 
@@ -303,6 +303,8 @@ def home(request: Request, db: Session = Depends(get_db)):
         sort_order = "desc"
         transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
     transactions = db.scalars(transaction_query.limit(500)).all()
+    classified_count = sum(1 for row in transactions if row.account and row.account.name.upper() != "A CLASSIFICAR")
+    pending_count = len(transactions) - classified_count
     bank_options = db.scalars(
         select(Transaction.bank)
         .where(Transaction.company_id == company.id, Transaction.bank != "")
@@ -318,6 +320,14 @@ def home(request: Request, db: Session = Depends(get_db)):
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     current_user_membership = current_membership(user, company, db)
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+    anticipations = db.scalars(
+        select(Anticipation).where(Anticipation.company_id == company.id).order_by(Anticipation.created_at.desc())
+    ).all()
+    anticipation_total_titles = sum(row.title_value for row in anticipations)
+    anticipation_total_cost = sum(
+        (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value
+        for row in anticipations
+    )
     debt_rows = [{"debt": debt, "overdue_days": debt_overdue_days(debt)} for debt in debts]
     purchases_report = purchases(db, company.id)
     report_debt_id = request.query_params.get("debt_report")
@@ -339,6 +349,11 @@ def home(request: Request, db: Session = Depends(get_db)):
         "saldo_periodo": sum(row["saldo_mes"] for row in cashflow_report),
         "saldo_acumulado": cashflow_report[-1]["saldo_acumulado"] if cashflow_report else 0,
     }
+    cashflow_explanation = (
+        "As saidas do periodo ficaram maiores que as entradas."
+        if cashflow_totals["saldo_periodo"] < 0
+        else "As entradas do periodo ficaram maiores ou iguais as saidas."
+    )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -348,6 +363,8 @@ def home(request: Request, db: Session = Depends(get_db)):
             "accounts": accounts,
             "rules": rules,
             "transactions": transactions,
+            "classified_count": classified_count,
+            "pending_count": pending_count,
             "imports": imports,
             "user_memberships": user_memberships,
             "access_summary": {
@@ -359,6 +376,12 @@ def home(request: Request, db: Session = Depends(get_db)):
             "current_membership": current_user_membership,
             "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
+            "anticipations": anticipations,
+            "anticipation_summary": {
+                "title_total": anticipation_total_titles,
+                "cost_total": anticipation_total_cost,
+                "net_total": anticipation_total_titles - anticipation_total_cost,
+            },
             "debt_rows": debt_rows,
             "debt_report": debt_evolution(selected_debt, report_months),
             "debt_report_months": report_months,
@@ -375,6 +398,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "dashboard": dashboard(db, company.id),
             "cashflow": cashflow_report,
             "cashflow_totals": cashflow_totals,
+            "cashflow_explanation": cashflow_explanation,
             "dre": dre(db, company.id),
             "balance": balance_sheet(db, company.id),
             "purchases": purchases_report,
@@ -695,6 +719,42 @@ def bulk_classify_transactions(
             row.account_id = account.id
         db.commit()
     return RedirectResponse("/?tab=extratos", status_code=303)
+
+
+@app.post("/anticipations")
+def create_anticipation(
+    request: Request,
+    anticipation_date: str = Form(""),
+    counterparty: str = Form(...),
+    counterparty_type: str = Form("Empresa"),
+    title_value: float = Form(0),
+    title_fee_rate: float = Form(0),
+    interest_rate: float = Form(0),
+    iof_value: float = Form(0),
+    costs_value: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    db.add(
+        Anticipation(
+            company_id=company.id,
+            anticipation_date=parse_filter_date(anticipation_date),
+            counterparty=counterparty.strip(),
+            counterparty_type=counterparty_type,
+            title_value=title_value,
+            title_fee_rate=title_fee_rate,
+            interest_rate=interest_rate,
+            iof_value=iof_value,
+            costs_value=costs_value,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse("/?tab=antecipacoes", status_code=303)
 
 
 @app.post("/fiscal/import-xml")

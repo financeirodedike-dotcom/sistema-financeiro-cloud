@@ -145,3 +145,22 @@ class Debt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
+
+
+class Anticipation(Base):
+    __tablename__ = "anticipations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    anticipation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    counterparty: Mapped[str] = mapped_column(String(160), index=True)
+    counterparty_type: Mapped[str] = mapped_column(String(60), default="Empresa")
+    title_value: Mapped[float] = mapped_column(Float, default=0)
+    title_fee_rate: Mapped[float] = mapped_column(Float, default=0)
+    interest_rate: Mapped[float] = mapped_column(Float, default=0)
+    iof_value: Mapped[float] = mapped_column(Float, default=0)
+    costs_value: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()

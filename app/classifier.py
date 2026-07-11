@@ -25,6 +25,6 @@ def classify_account(db: Session, company_id: int, history: str) -> FinancialAcc
     return db.scalar(
         select(FinancialAccount).where(
             FinancialAccount.company_id == company_id,
-            FinancialAccount.name == "A classificar",
+            FinancialAccount.name == "A CLASSIFICAR",
         )
     )
