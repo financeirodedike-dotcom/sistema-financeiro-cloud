@@ -53,7 +53,50 @@ def dre(db: Session, company_id: int) -> list[dict]:
     for row in rows:
         line = row.account.dre_line if row.account else "Outras Receitas/Despesas"
         lines[line] += row.entrada - row.saida
-    return [{"line": line, "value": value} for line, value in sorted(lines.items())]
+
+    receita_bruta = lines["Receita Bruta"]
+    outras_receitas = lines["Outras Receitas"]
+    receita_total = receita_bruta + outras_receitas
+    custos = lines["Custos e Compras"]
+    margem_bruta = receita_total + custos
+
+    despesas_operacionais = (
+        lines["Despesas Comerciais"]
+        + lines["Despesas Fixas"]
+        + lines["Despesas Operacionais"]
+        + lines["Despesas com Pessoal"]
+        + lines["Encargos sobre Folha"]
+        + lines["Impostos"]
+    )
+    resultado_operacional = margem_bruta + despesas_operacionais
+    resultado_gerencial = resultado_operacional + lines["Resultado Financeiro"] + lines["Outras Receitas/Despesas"]
+    movimentacoes_nao_operacionais = lines["Investimentos"] + lines["Distribuições/Sócios"] + lines["Transferências"]
+
+    def row(label: str, value: float, kind: str = "line") -> dict:
+        pct = (value / receita_total * 100) if receita_total else 0
+        return {"line": label, "value": value, "pct": pct, "kind": kind}
+
+    return [
+        row("Receita Bruta", receita_bruta),
+        row("Outras Receitas", outras_receitas),
+        row("Receita Total", receita_total, "subtotal"),
+        row("(-) Custos e Compras", custos),
+        row("Margem Bruta", margem_bruta, "subtotal"),
+        row("(-) Despesas Comerciais", lines["Despesas Comerciais"]),
+        row("(-) Despesas Fixas", lines["Despesas Fixas"]),
+        row("(-) Despesas Operacionais", lines["Despesas Operacionais"]),
+        row("(-) Despesas com Pessoal", lines["Despesas com Pessoal"]),
+        row("(-) Encargos sobre Folha", lines["Encargos sobre Folha"]),
+        row("(-) Impostos", lines["Impostos"]),
+        row("Resultado Operacional", resultado_operacional, "subtotal"),
+        row("Resultado Financeiro", lines["Resultado Financeiro"]),
+        row("Outras Receitas/Despesas", lines["Outras Receitas/Despesas"]),
+        row("Resultado Gerencial", resultado_gerencial, "final"),
+        row("Investimentos", lines["Investimentos"], "support"),
+        row("Distribuições/Sócios", lines["Distribuições/Sócios"], "support"),
+        row("Transferências", lines["Transferências"], "support"),
+        row("Movimentações não operacionais", movimentacoes_nao_operacionais, "support-total"),
+    ]
 
 
 def purchases(db: Session, company_id: int) -> dict:
@@ -100,7 +143,7 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
     for row in rows:
         if row.saida <= 0:
             continue
-        group = row.account.group_name if row.account else "A classificar"
+        group = row.account.group_name if row.account else "A CLASSIFICAR"
         by_group[group] += row.saida
     max_group = max(list(by_group.values()) + [1])
     expense_groups = [

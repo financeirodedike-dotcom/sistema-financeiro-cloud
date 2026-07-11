@@ -104,6 +104,13 @@
     .money-formula { font-size: 18px; font-weight: 900; color: #12355b; }
     .classified-card { border-color: #bbf7d0; background: #f0fdf4; }
     .pending-card { border-color: #fde68a; background: #fffbeb; }
+    .dre-report { max-width: 980px; }
+    .dre-report th:last-child, .dre-report td:last-child,
+    .dre-report th:nth-child(2), .dre-report td:nth-child(2) { text-align: right; }
+    .dre-subtotal td { background: #eaf3fb; font-weight: 900; border-top: 2px solid #9db6d1; }
+    .dre-final td { background: #12355b; color: white; font-weight: 900; font-size: 15px; }
+    .dre-support td { color: #667085; }
+    .dre-support-total td { background: #f6f8fb; font-weight: 800; color: #475467; }
     .score-list { display: grid; gap: 8px; }
     .score-row { display: grid; grid-template-columns: 120px 1fr 42px; gap: 10px; align-items: center; font-size: 13px; }
     .score-track { height: 10px; background: #e8eef5; border-radius: 999px; overflow: hidden; }
@@ -195,7 +202,7 @@
         <div class="kpi"><span>Receitas</span><strong>{{ dashboard.receitas|brl }}</strong></div>
         <div class="kpi"><span>Despesas</span><strong>{{ dashboard.despesas|brl }}</strong></div>
         <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">{{ dashboard.resultado|brl }}</strong></div>
-        <div class="kpi"><span>A classificar</span><strong>{{ dashboard.pendentes }}</strong></div>
+        <div class="kpi"><span>A CLASSIFICAR</span><strong>{{ dashboard.pendentes }}</strong></div>
       </div>
       <div class="panel insight">
         <h2>Leitura rapida do caixa</h2>
@@ -273,7 +280,7 @@
           <div class="pillar"><strong>Receitas</strong><span>{{ dashboard.receitas|brl }}</span></div>
           <div class="pillar"><strong>Despesas</strong><span>{{ dashboard.despesas|brl }}</span></div>
           <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
-          <div class="pillar"><strong>A classificar</strong><span>{{ dashboard.pendentes }} lancamentos</span></div>
+          <div class="pillar"><strong>A CLASSIFICAR</strong><span>{{ dashboard.pendentes }} lancamentos</span></div>
           <div class="pillar"><strong>Dividas</strong><span>{{ balance.debt_total|brl }}</span></div>
         </div>
       </div>
@@ -451,7 +458,7 @@
                 <td>{{ row.date }}</td>
                 <td>{{ row.history }}</td>
                 <td>{{ row.bank }}</td>
-                <td>{{ row.account.name if row.account else "A classificar" }}</td>
+                <td>{{ row.account.name if row.account else "A CLASSIFICAR" }}</td>
                 <td>
                   {% if is_classified %}
                   <span class="pill status-ok">Lancado / classificado</span>
@@ -489,7 +496,7 @@
           <button type="button" data-group="Despesas Fixas" data-dre="Despesas Fixas" data-cashflow="Operacional">Despesas Fixas</button>
           <button type="button" data-group="Pessoal" data-dre="Despesas com Pessoal" data-cashflow="Operacional">Pessoal</button>
           <button type="button" data-group="Financeiro" data-dre="Resultado Financeiro" data-cashflow="Financiamento">Financeiro</button>
-          <button type="button" data-group="Transferencias" data-dre="Transferencias" data-cashflow="Transferencia">Transferencias</button>
+          <button type="button" data-group="Transferências" data-dre="Transferências" data-cashflow="Transferência">Transferências</button>
           <button type="button" data-group="Caixa e Bancos" data-dre="Disponibilidades" data-cashflow="Operacional">Caixa/Bancos</button>
           <button type="button" data-group="Outras" data-dre="Outras Receitas/Despesas" data-cashflow="Operacional">Outras</button>
         </div>
@@ -739,13 +746,18 @@
 
     <section id="dre" class="tab">
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
-      <div class="panel">
+      <div class="panel dre-report">
         <h2>DRE Gerencial</h2>
+        <p class="muted">Relatorio gerencial no modelo: receitas, custos, margem, despesas, resultado financeiro e resultado final. Os percentuais usam a Receita Total como base.</p>
         <table>
-          <thead><tr><th>Linha</th><th>Valor</th></tr></thead>
+          <thead><tr><th>Linha</th><th>Valor</th><th>% Receita</th></tr></thead>
           <tbody>
             {% for row in dre %}
-            <tr><td>{{ row.line }}</td><td class="{{ 'negative' if row.value < 0 else 'positive' }}">{{ row.value|brl }}</td></tr>
+            <tr class="dre-{{ row.kind }}">
+              <td>{{ row.line }}</td>
+              <td class="{{ 'negative' if row.value < 0 and row.kind != 'final' else 'positive' if row.value > 0 and row.kind != 'final' else '' }}">{{ row.value|brl }}</td>
+              <td>{{ "%.2f"|format(row.pct) }}%</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>

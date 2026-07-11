@@ -1,4 +1,5 @@
 import hashlib
+import unicodedata
 from datetime import date
 from xml.etree import ElementTree
 
@@ -33,8 +34,8 @@ templates.env.filters["brl"] = format_brl
 
 
 DEFAULT_ACCOUNTS = [
-    ("A classificar", "Outras", "Outras Receitas/Despesas", "Operacional"),
-    ("VENDA A VISTA", "Receitas", "Receita Bruta", "Operacional"),
+    ("A CLASSIFICAR", "Outras", "Outras Receitas/Despesas", "Operacional"),
+    ("VENDA À VISTA", "Receitas", "Receita Bruta", "Operacional"),
     ("VENDA A PRAZO ANTECIPADAS", "Receitas", "Receita Bruta", "Operacional"),
     ("VENDAS REFORMA", "Receitas", "Receita Bruta", "Operacional"),
     ("VENDA DE SERVIÇO", "Receitas", "Receita Bruta", "Operacional"),
@@ -43,28 +44,28 @@ DEFAULT_ACCOUNTS = [
     ("MATÉRIA PRIMA", "Custos e Compras", "Custos e Compras", "Operacional"),
     ("MATERIAL DE CONSUMO", "Custos e Compras", "Custos e Compras", "Operacional"),
     ("ALUGUEL DO IMÓVEL", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("ENERGIA ELETRICA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("AGUA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("TELEFONIA MOVEL", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("ENERGIA ELÉTRICA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("ÁGUA", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("TELEFONIA MÓVEL", "Despesas Fixas", "Despesas Fixas", "Operacional"),
     ("INTERNET", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("LOCAÇÃO DE SOFTWAE", "Despesas Fixas", "Despesas Fixas", "Operacional"),
-    ("HONORARIOS ADVOCATÍCIOS", "Serviços", "Despesas Operacionais", "Operacional"),
+    ("LOCAÇÃO DE SOFTWARE", "Despesas Fixas", "Despesas Fixas", "Operacional"),
+    ("HONORÁRIOS ADVOCATÍCIOS", "Serviços", "Despesas Operacionais", "Operacional"),
     ("HONORÁRIOS CONTÁBEIS", "Serviços", "Despesas Operacionais", "Operacional"),
-    ("COMBUSTIVEIS", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("COMBUSTÍVEIS", "Operacional", "Despesas Operacionais", "Operacional"),
     ("PEDÁGIO", "Operacional", "Despesas Operacionais", "Operacional"),
-    ("MANUTENÇÃO DE VEICULOS", "Operacional", "Despesas Operacionais", "Operacional"),
+    ("MANUTENÇÃO DE VEÍCULOS", "Operacional", "Despesas Operacionais", "Operacional"),
     ("SEGUROS DE VEÍCULOS", "Operacional", "Despesas Operacionais", "Operacional"),
     ("IPVA", "Operacional", "Despesas Operacionais", "Operacional"),
     ("LICENCIAMENTO ANUAL", "Operacional", "Despesas Operacionais", "Operacional"),
     ("FINANCIAMENTO STRADA", "Financeiro", "Resultado Financeiro", "Financiamento"),
-    ("MATÉRIAL DE ESCRITÓRIO", "Administrativo", "Despesas Operacionais", "Operacional"),
-    ("MATÉRIAL DE LIMPEZA", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("MATERIAL DE ESCRITÓRIO", "Administrativo", "Despesas Operacionais", "Operacional"),
+    ("MATERIAL DE LIMPEZA", "Administrativo", "Despesas Operacionais", "Operacional"),
     ("DIARISTA / LIMPEZA", "Administrativo", "Despesas Operacionais", "Operacional"),
     ("ALIMENTAÇÃO/ MERCADO", "Administrativo", "Despesas Operacionais", "Operacional"),
     ("FRETE COMPRAS", "Custos e Compras", "Custos e Compras", "Operacional"),
     ("MANUTENÇÃO EMPRESA", "Manutenção", "Despesas Operacionais", "Operacional"),
-    ("MANUTENÇÃO MAQUINAS E EQUIPAMENTOS", "Manutenção", "Despesas Operacionais", "Operacional"),
-    ("MOVEIS E UTENSILIOS", "Investimentos", "Investimentos", "Investimento"),
+    ("MANUTENÇÃO MÁQUINAS E EQUIPAMENTOS", "Manutenção", "Despesas Operacionais", "Operacional"),
+    ("MÓVEIS E UTENSÍLIOS", "Investimentos", "Investimentos", "Investimento"),
     ("ESTACIONAMENTO", "Operacional", "Despesas Operacionais", "Operacional"),
     ("SERASA", "Administrativo", "Despesas Operacionais", "Operacional"),
     ("HOSPEDAGEM SITE", "Marketing", "Despesas Operacionais", "Operacional"),
@@ -73,18 +74,18 @@ DEFAULT_ACCOUNTS = [
     ("FERRAMENTAS", "Investimentos", "Investimentos", "Investimento"),
     ("EQUIPAMENTOS DE T.I.", "Investimentos", "Investimentos", "Investimento"),
     ("MARKETING", "Marketing", "Despesas Comerciais", "Operacional"),
-    ("COMISSAO", "Comercial", "Despesas Comerciais", "Operacional"),
+    ("COMISSÃO", "Comercial", "Despesas Comerciais", "Operacional"),
     ("FRETE VENDAS", "Comercial", "Despesas Comerciais", "Operacional"),
     ("SIMPLES NACIONAL DAS", "Fiscal", "Impostos", "Operacional"),
     ("SERVIÇOS TERCEIRIZADOS", "Serviços", "Despesas Operacionais", "Operacional"),
-    ("SALARIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("SALÁRIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA AJUDA DE CUSTO", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA VALE COMPRA/TRANSPORTE", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("HORAS EXTRAS", "Pessoal", "Despesas com Pessoal", "Operacional"),
-    ("13 SALARIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("13 SALÁRIO", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("FÉRIAS FUNCIONÁRIOS", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA RESCISÃO", "Pessoal", "Despesas com Pessoal", "Operacional"),
-    ("DESPESA MULTA RECISÃO 40% FGTS", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA MULTA RESCISÃO 40% FGTS", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA ASSISTÊNCIA MÉDICA / PLANO DE SAÚDE", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("FARMÁCIA", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("INSS", "Pessoal", "Encargos sobre Folha", "Operacional"),
@@ -93,9 +94,9 @@ DEFAULT_ACCOUNTS = [
     ("DESPESA UNIFORMES", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA MEDICINA OCUPACIONAL", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("EPI", "Pessoal", "Despesas com Pessoal", "Operacional"),
-    ("DESPESA BONUS PONTUALIDADE", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DESPESA BÔNUS PONTUALIDADE", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("DESPESA ENDOMARKETING", "Pessoal", "Despesas com Pessoal", "Operacional"),
-    ("DEPOSITO JUDICIAL TRABALHISTA", "Pessoal", "Despesas com Pessoal", "Operacional"),
+    ("DEPÓSITO JUDICIAL TRABALHISTA", "Pessoal", "Despesas com Pessoal", "Operacional"),
     ("CLARA JAILMA M T COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
     ("ANDRÉ LUIS DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
     ("ALTAMIR DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
@@ -103,7 +104,7 @@ DEFAULT_ACCOUNTS = [
     ("LUIZ HENRIQUE DA COSTA", "Sócios", "Distribuições/Sócios", "Financiamento"),
     ("TARIFAS BANCÁRIAS", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("BORDÊRO", "Financeiro", "Resultado Financeiro", "Financiamento"),
-    ("JUROS ANTECIPAÇÕES DE TITULOS", "Financeiro", "Resultado Financeiro", "Financiamento"),
+    ("JUROS ANTECIPAÇÕES DE TÍTULOS", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("JUROS POR ATRASO", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("JUROS LIMITE", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("JUROS EMPRÉSTIMOS", "Financeiro", "Resultado Financeiro", "Financiamento"),
@@ -111,7 +112,7 @@ DEFAULT_ACCOUNTS = [
     ("IOF", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("ROTATIVO CRESOL", "Financeiro", "Resultado Financeiro", "Financiamento"),
     ("TARIFA FLAT BB", "Financeiro", "Resultado Financeiro", "Financiamento"),
-    ("TRANSFERENCIA ENTRE CONTAS", "Transferencias", "Transferencias", "Transferencia"),
+    ("TRANSFERÊNCIA ENTRE CONTAS", "Transferências", "Transferências", "Transferência"),
 ]
 
 BANK_SOURCES = [
@@ -146,33 +147,46 @@ def normalize_account_name(name: str) -> str:
     return " ".join(name.strip().upper().split())
 
 
+def account_dedupe_key(name: str) -> str:
+    normalized = unicodedata.normalize("NFKD", normalize_account_name(name))
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
 def seed_company_accounts(db: Session, company: Company) -> None:
     existing_accounts = db.scalars(
         select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.id)
     ).all()
-    by_name = {}
-    duplicates_found = False
+    default_by_key = {account_dedupe_key(name): (normalize_account_name(name), group, dre_line, cashflow) for name, group, dre_line, cashflow in DEFAULT_ACCOUNTS}
+    grouped_accounts: dict[str, list[FinancialAccount]] = {}
     for account in existing_accounts:
-        normalized = normalize_account_name(account.name)
-        if normalized in by_name:
-            keeper = by_name[normalized]
+        grouped_accounts.setdefault(account_dedupe_key(account.name), []).append(account)
+
+    by_name = {}
+    for key, grouped in grouped_accounts.items():
+        preferred_name = default_by_key.get(key, (normalize_account_name(grouped[0].name), "", "", ""))[0]
+        keeper = next((account for account in grouped if normalize_account_name(account.name) == preferred_name), grouped[0])
+        for account in grouped:
+            if account.id == keeper.id:
+                continue
             for transaction in db.scalars(
                 select(Transaction).where(Transaction.company_id == company.id, Transaction.account_id == account.id)
             ).all():
                 transaction.account_id = keeper.id
+            for rule in db.scalars(
+                select(ClassificationRule).where(ClassificationRule.company_id == company.id, ClassificationRule.account_id == account.id)
+            ).all():
+                rule.account_id = keeper.id
             account.name = f"REMOVER DUPLICADA {account.id}"
             db.delete(account)
-            duplicates_found = True
-            continue
-        by_name[normalized] = account
-    if duplicates_found:
-        db.flush()
-    for normalized, account in by_name.items():
-        account.name = normalized
+        keeper.name = preferred_name
+        by_name[key] = keeper
+    db.flush()
     for name, group, dre_line, cashflow in DEFAULT_ACCOUNTS:
         normalized = normalize_account_name(name)
-        if normalized in by_name:
-            account = by_name[normalized]
+        key = account_dedupe_key(name)
+        if key in by_name:
+            account = by_name[key]
+            account.name = normalized
             account.group_name = group
             account.dre_line = dre_line
             account.cashflow_class = cashflow
@@ -510,8 +524,19 @@ def create_account(
         return context
     _user, company = context
     clean_name = normalize_account_name(name)
-    existing = db.scalar(select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.name == clean_name))
+    default_by_key = {account_dedupe_key(default_name): normalize_account_name(default_name) for default_name, *_ in DEFAULT_ACCOUNTS}
+    canonical_key = account_dedupe_key(clean_name)
+    clean_name = default_by_key.get(canonical_key, clean_name)
+    existing = next(
+        (
+            account
+            for account in db.scalars(select(FinancialAccount).where(FinancialAccount.company_id == company.id)).all()
+            if account_dedupe_key(account.name) == canonical_key
+        ),
+        None,
+    )
     if existing:
+        existing.name = clean_name
         existing.group_name = group_name
         existing.dre_line = dre_line
         existing.cashflow_class = cashflow_class
