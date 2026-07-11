@@ -188,6 +188,8 @@ def home(request: Request, db: Session = Depends(get_db)):
     date_from_raw = request.query_params.get("date_from", "")
     date_to_raw = request.query_params.get("date_to", "")
     bank_filter = request.query_params.get("bank", "")
+    history_filter = request.query_params.get("history", "").strip()
+    sort_order = request.query_params.get("sort", "desc")
     date_from = parse_filter_date(date_from_raw)
     date_to = parse_filter_date(date_to_raw)
     transaction_query = select(Transaction).where(Transaction.company_id == company.id)
@@ -197,7 +199,14 @@ def home(request: Request, db: Session = Depends(get_db)):
         transaction_query = transaction_query.where(Transaction.date <= date_to)
     if bank_filter:
         transaction_query = transaction_query.where(Transaction.bank == bank_filter)
-    transactions = db.scalars(transaction_query.order_by(Transaction.date.desc()).limit(500)).all()
+    if history_filter:
+        transaction_query = transaction_query.where(Transaction.history.ilike(f"%{history_filter}%"))
+    if sort_order == "asc":
+        transaction_query = transaction_query.order_by(Transaction.date.asc(), Transaction.id.asc())
+    else:
+        sort_order = "desc"
+        transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
+    transactions = db.scalars(transaction_query.limit(500)).all()
     bank_options = db.scalars(
         select(Transaction.bank)
         .where(Transaction.company_id == company.id, Transaction.bank != "")
@@ -263,6 +272,8 @@ def home(request: Request, db: Session = Depends(get_db)):
                 "date_from": date_from_raw,
                 "date_to": date_to_raw,
                 "bank": bank_filter,
+                "history": history_filter,
+                "sort": sort_order,
             },
             "active_tab": request.query_params.get("tab", "dashboard"),
             "dashboard": dashboard(db, company.id),
@@ -371,6 +382,7 @@ def create_account(
     group_name: str = Form("Outras"),
     dre_line: str = Form("Outras Receitas/Despesas"),
     cashflow_class: str = Form("Operacional"),
+    return_tab: str = Form("classificacao"),
     db: Session = Depends(get_db),
 ):
     context = require_context(request, db)
@@ -395,7 +407,9 @@ def create_account(
             )
         )
     db.commit()
-    return RedirectResponse("/", status_code=303)
+    if return_tab not in {"classificacao", "extratos", "financeiro"}:
+        return_tab = "classificacao"
+    return RedirectResponse(f"/?tab={return_tab}", status_code=303)
 
 
 @app.post("/access/users")

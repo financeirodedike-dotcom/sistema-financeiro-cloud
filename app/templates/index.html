@@ -345,15 +345,33 @@
           <input type="hidden" name="tab" value="extratos">
           <input name="date_from" type="date" value="{{ filters.date_from }}">
           <input name="date_to" type="date" value="{{ filters.date_to }}">
+          <input name="history" placeholder="Pesquisar historico" value="{{ filters.history }}">
           <select name="bank">
             <option value="">Todos os bancos/caixas</option>
             {% for bank in bank_options %}
             <option value="{{ bank }}" {% if filters.bank == bank %}selected{% endif %}>{{ bank }}</option>
             {% endfor %}
           </select>
+          <select name="sort">
+            <option value="desc" {% if filters.sort == "desc" %}selected{% endif %}>Mais novo primeiro</option>
+            <option value="asc" {% if filters.sort == "asc" %}selected{% endif %}>Mais antigo primeiro</option>
+          </select>
           <button type="submit">Pesquisar</button>
+          <button type="submit" name="sort" value="desc">Ordenar mais novo</button>
           <a class="pill" href="/?tab=extratos">Limpar filtros</a>
         </form>
+      </div>
+      <div class="panel">
+        <h2>Criar conta financeira rapida</h2>
+        <form action="/accounts" method="post">
+          <input type="hidden" name="return_tab" value="extratos">
+          <input name="name" placeholder="Conta financeira" required>
+          <input name="group_name" placeholder="Grupo" value="Outras">
+          <input name="dre_line" placeholder="Linha DRE" value="Outras Receitas/Despesas">
+          <input name="cashflow_class" placeholder="Classe fluxo" value="Operacional">
+          <button type="submit">Salvar conta</button>
+        </form>
+        <p class="muted">Depois de salvar, a nova conta ja aparece na lista de classificacao dos lancamentos.</p>
       </div>
       <div class="panel">
         <h2>Banco de dados de lancamentos</h2>
