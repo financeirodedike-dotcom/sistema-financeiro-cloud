@@ -46,17 +46,31 @@ def init_db():
 
 def ensure_lightweight_migrations():
     inspector = inspect(engine)
-    if "debts" not in inspector.get_table_names():
-        return
+    table_names = inspector.get_table_names()
 
-    existing_columns = {column["name"] for column in inspector.get_columns("debts")}
-    new_columns = {
-        "debt_date": "DATE",
-        "due_date": "DATE",
-        "creditor_type": "VARCHAR(60) DEFAULT 'Banco'",
-        "interest_type": "VARCHAR(40) DEFAULT 'Compostos'",
-    }
     with engine.begin() as connection:
-        for name, ddl in new_columns.items():
-            if name not in existing_columns:
-                connection.execute(text(f"ALTER TABLE debts ADD COLUMN {name} {ddl}"))
+        if "debts" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("debts")}
+            new_columns = {
+                "debt_date": "DATE",
+                "due_date": "DATE",
+                "creditor_type": "VARCHAR(60) DEFAULT 'Banco'",
+                "interest_type": "VARCHAR(40) DEFAULT 'Compostos'",
+            }
+            for name, ddl in new_columns.items():
+                if name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE debts ADD COLUMN {name} {ddl}"))
+
+        if "import_batches" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("import_batches")}
+            new_columns = {
+                "bank": "VARCHAR(160) DEFAULT ''",
+                "start_date": "DATE",
+                "end_date": "DATE",
+                "opening_balance": "FLOAT",
+                "closing_balance": "FLOAT",
+                "balance_source": "VARCHAR(40) DEFAULT ''",
+            }
+            for name, ddl in new_columns.items():
+                if name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE import_batches ADD COLUMN {name} {ddl}"))

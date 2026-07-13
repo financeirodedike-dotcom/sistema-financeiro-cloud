@@ -241,7 +241,7 @@
             <tbody>
               {% for row in cashflow_diagnostics.worst_months %}
               <tr>
-                <td>{{ row.month }}</td>
+                <td>{{ row.month|month_br }}</td>
                 <td>{{ row.entradas|brl }}</td>
                 <td>{{ row.saidas|brl }}</td>
                 <td class="{{ 'negative' if row.saldo < 0 else 'positive' }}">{{ row.saldo|brl }}</td>
@@ -309,7 +309,7 @@
           <div class="chart">
             {% for row in charts.flow_rows %}
             <div class="chart-row">
-              <strong>{{ row.month }}</strong>
+              <strong>{{ row.month|month_br }}</strong>
               <div class="mini-bars">
                 <div class="bar-track"><div class="bar in" style="width: {{ row.entrada_pct }}%"></div></div>
                 <div class="bar-track"><div class="bar out" style="width: {{ row.saida_pct }}%"></div></div>
@@ -568,11 +568,25 @@
           {% if request.query_params.get("balance_imported") == "1" %}
           <p class="positive">Saldo do OFX importado para a aba Financeiro > Conciliacao.</p>
           {% endif %}
+          <hr>
+          <h2>Atualizar saldos de OFX ja importado</h2>
+          <form action="/import-ofx-balances" method="post" enctype="multipart/form-data">
+            <select name="bank_account" required>
+              <option value="">Escolha banco/caixa</option>
+              {% for source in bank_sources %}
+              <option value="{{ source }}">{{ source }}</option>
+              {% endfor %}
+            </select>
+            <input name="bank_other" placeholder="Outro banco, se necessario">
+            <input type="file" name="file" accept=".ofx" required>
+            <button type="submit">Puxar somente saldos</button>
+          </form>
+          <p class="muted">Use este botao para mandar novamente um OFX antigo e atualizar saldo inicial/final na conciliacao sem duplicar lancamentos.</p>
         </div>
         <div class="panel">
           <h2>Lancamento manual</h2>
           <form action="/transactions/manual" method="post">
-            <input name="transaction_date" type="date" required>
+            <input name="transaction_date" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" required>
             <select name="bank_account" required>
               {% for source in bank_sources %}
               <option value="{{ source }}" {% if source == "Caixa Interno" %}selected{% endif %}>{{ source }}</option>
@@ -595,8 +609,8 @@
         <h2>Pesquisar extratos</h2>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="extratos">
-          <input name="date_from" type="date" value="{{ filters.date_from }}">
-          <input name="date_to" type="date" value="{{ filters.date_to }}">
+          <input name="date_from" type="text" inputmode="numeric" placeholder="Data inicial dd/mm/aaaa" value="{{ filters.date_from }}">
+          <input name="date_to" type="text" inputmode="numeric" placeholder="Data final dd/mm/aaaa" value="{{ filters.date_to }}">
           <input name="history" placeholder="Pesquisar historico" value="{{ filters.history }}">
           <select name="bank">
             <option value="">Todos os bancos/caixas</option>
@@ -644,7 +658,7 @@
               {% set is_classified = row.account and row.account.name.upper() != "A CLASSIFICAR" %}
               <tr class="{{ 'classified-row' if is_classified else 'pending-row' }}">
                 <td><input form="bulk-classify-form" type="checkbox" name="transaction_ids" value="{{ row.id }}"></td>
-                <td>{{ row.date }}</td>
+                <td>{{ row.date|date_br }}</td>
                 <td>{{ row.history }}</td>
                 <td>{{ row.bank }}</td>
                 <td>{{ row.account.name if row.account else "A CLASSIFICAR" }}</td>
@@ -754,7 +768,7 @@
           <thead><tr><th>Data</th><th>Historico</th><th>Conta</th><th>Valor</th></tr></thead>
           <tbody>
             {% for row in purchases.rows %}
-            <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>{{ row.saida|brl }}</td></tr>
+            <tr><td>{{ row.date|date_br }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>{{ row.saida|brl }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -779,7 +793,7 @@
           <h2>Novo titulo a pagar</h2>
           <form action="/" method="get">
             <input type="hidden" name="tab" value="contas-pagar">
-            <input type="date" name="due_date">
+            <input type="text" inputmode="numeric" name="due_date" placeholder="dd/mm/aaaa">
             <input name="supplier" placeholder="Fornecedor">
             <input name="description" placeholder="Descricao">
             <input type="number" step="0.01" name="amount" placeholder="Valor">
@@ -793,7 +807,7 @@
             <thead><tr><th>Credor</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
             <tbody>
               {% for debt in debts %}
-              <tr><td>{{ debt.creditor }}</td><td>{{ debt.due_date or "" }}</td><td>{{ debt.capital_value|brl }}</td><td>{{ debt.status }}</td></tr>
+              <tr><td>{{ debt.creditor }}</td><td>{{ debt.due_date|date_br }}</td><td>{{ debt.capital_value|brl }}</td><td>{{ debt.status }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -819,7 +833,7 @@
           <h2>Novo titulo a receber</h2>
           <form action="/" method="get">
             <input type="hidden" name="tab" value="contas-receber">
-            <input type="date" name="due_date">
+            <input type="text" inputmode="numeric" name="due_date" placeholder="dd/mm/aaaa">
             <input name="customer" placeholder="Cliente">
             <input name="description" placeholder="Descricao">
             <input type="number" step="0.01" name="amount" placeholder="Valor">
@@ -833,7 +847,7 @@
             <tbody>
               {% for row in transactions %}
               {% if row.entrada > 0 %}
-              <tr><td>{{ row.date }}</td><td>{{ row.history }}</td><td>{{ row.entrada|brl }}</td></tr>
+              <tr><td>{{ row.date|date_br }}</td><td>{{ row.history }}</td><td>{{ row.entrada|brl }}</td></tr>
               {% endif %}
               {% endfor %}
             </tbody>
@@ -859,7 +873,7 @@
         <div class="panel">
           <h2>Nova antecipacao</h2>
           <form action="/anticipations" method="post">
-            <input name="anticipation_date" type="date" title="Data">
+            <input name="anticipation_date" type="text" inputmode="numeric" placeholder="dd/mm/aaaa" title="Data">
             <input name="counterparty" placeholder="Empresa ou pessoa fisica" required>
             <select name="counterparty_type">
               <option value="Empresa">Empresa</option>
@@ -889,7 +903,7 @@
             {% for row in anticipations %}
             {% set total_cost = (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value %}
             <tr>
-              <td>{{ row.anticipation_date or "" }}</td>
+              <td>{{ row.anticipation_date|date_br }}</td>
               <td>{{ row.counterparty }}</td>
               <td>{{ row.counterparty_type }}</td>
               <td>{{ row.title_value|brl }}</td>
@@ -939,7 +953,7 @@
           <tbody>
             {% for row in cashflow %}
             <tr>
-              <td>{{ row.month }}</td>
+              <td>{{ row.month|month_br }}</td>
               <td>{{ row.entradas|brl }}</td>
               <td>{{ row.saidas|brl }}</td>
               <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">{{ row.saldo_mes|brl }}</td>
@@ -997,7 +1011,7 @@
           <tbody>
             {% for row in planned_cashflow.rows %}
             <tr>
-              <td>{{ row.month }}</td>
+              <td>{{ row.month|month_br }}</td>
               <td>{{ row.planned_inflows|brl }}</td>
               <td>{{ row.planned_outflows|brl }}</td>
               <td class="{{ 'negative' if row.planned_balance < 0 else 'positive' }}">{{ row.planned_balance|brl }}</td>
@@ -1058,7 +1072,7 @@
           <tbody>
             {% for row in bank_reconciliation.rows %}
             <tr>
-              <td>{{ row.month }}</td>
+              <td>{{ row.month|month_br }}</td>
               <td>{{ row.bank }}</td>
               <td>{{ row.opening_balance|brl }}</td>
               <td>{{ row.entradas|brl }}</td>
@@ -1130,8 +1144,8 @@
       <div class="panel">
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
-          <input name="debt_date" type="date" title="Data da divida">
-          <input name="due_date" type="date" title="Data de vencimento">
+          <input name="debt_date" type="text" inputmode="numeric" placeholder="Data da divida dd/mm/aaaa" title="Data da divida">
+          <input name="due_date" type="text" inputmode="numeric" placeholder="Vencimento dd/mm/aaaa" title="Data de vencimento">
           <input name="creditor" placeholder="Credor" required>
           <select name="creditor_type">
             <option value="Banco">Banco</option>
@@ -1162,8 +1176,8 @@
             {% set debt = item.debt %}
             {% set position = item.position %}
             <tr>
-              <td>{{ debt.debt_date or "" }}</td>
-              <td>{{ debt.due_date or "" }}</td>
+              <td>{{ debt.debt_date|date_br }}</td>
+              <td>{{ debt.due_date|date_br }}</td>
               <td class="{{ 'negative' if item.overdue_days > 0 else 'positive' }}">{{ item.overdue_days }}</td>
               <td>{{ debt.creditor_type }}</td>
               <td>{{ debt.creditor }}</td>
@@ -1181,8 +1195,8 @@
                 <details class="debt-edit">
                   <summary>Editar</summary>
                   <form action="/debts/{{ debt.id }}/update" method="post">
-                    <input name="debt_date" type="date" value="{{ debt.debt_date or '' }}">
-                    <input name="due_date" type="date" value="{{ debt.due_date or '' }}">
+                    <input name="debt_date" type="text" inputmode="numeric" value="{{ debt.debt_date|date_br }}" placeholder="dd/mm/aaaa">
+                    <input name="due_date" type="text" inputmode="numeric" value="{{ debt.due_date|date_br }}" placeholder="dd/mm/aaaa">
                     <input name="creditor" value="{{ debt.creditor }}" required>
                     <select name="creditor_type">
                       <option value="Banco" {% if debt.creditor_type == "Banco" %}selected{% endif %}>Banco</option>
@@ -1235,7 +1249,7 @@
           <tbody>
             {% for row in debt_report.rows %}
             <tr>
-              <td>{{ row.month }}</td>
+              <td>{{ row.month|month_br }}</td>
               <td>{{ row.opening_balance|brl }}</td>
               <td>{{ row.interest|brl }}</td>
               <td>{{ row.installment|brl }}</td>
@@ -1464,7 +1478,7 @@
                 <td>{{ membership.user.email }}</td>
                 <td><span class="role-badge">{{ membership.role }}</span></td>
                 <td class="{{ 'positive' if membership.user.is_active else 'negative' }}">{{ "Ativo" if membership.user.is_active else "Inativo" }}</td>
-                <td>{{ membership.created_at.date() }}</td>
+                <td>{{ membership.created_at|date_br }}</td>
                 <td>
                   {% if can_manage_access %}
                   <form action="/access/users/{{ membership.id }}/update" method="post">

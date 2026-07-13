@@ -34,6 +34,31 @@ def format_brl(value: float | int | None) -> str:
 templates.env.filters["brl"] = format_brl
 
 
+def format_date_br(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return value.strftime("%d/%m/%Y")
+    parsed = parse_filter_date(str(value))
+    return parsed.strftime("%d/%m/%Y") if parsed else str(value)
+
+
+def format_month_br(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        year, month = value[:7].split("-")
+        return f"{month}/{year}"
+    except ValueError:
+        return value
+
+
+templates.env.filters["date_br"] = format_date_br
+templates.env.filters["month_br"] = format_month_br
+
+
 DEFAULT_ACCOUNTS = [
     ("A CLASSIFICAR", "Outras", "Outras Receitas/Despesas", "Operacional"),
     ("VENDA À VISTA", "Receitas", "Receita Bruta", "Operacional"),
@@ -132,10 +157,53 @@ BANK_SOURCES = [
 def parse_filter_date(value: str | None) -> date | None:
     if not value:
         return None
+    clean_value = value.strip()
     try:
-        return date.fromisoformat(value)
+        return date.fromisoformat(clean_value)
     except ValueError:
+        pass
+    for pattern in ("%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(clean_value, pattern).date()
+        except ValueError:
+            continue
+    return None
+
+
+def update_reconciliation_from_ofx(
+    db: Session,
+    company: Company,
+    bank: str,
+    parsed: list[dict],
+    ofx_balances: dict,
+    filename: str,
+) -> BankReconciliation | None:
+    if not bank or not parsed or ofx_balances.get("closing_balance") is None:
         return None
+    end_date = ofx_balances.get("end_date") or max(item["date"] for item in parsed)
+    month = end_date.strftime("%Y-%m")
+    file_inflows = sum(item["entrada"] for item in parsed if item["date"].strftime("%Y-%m") == month)
+    file_outflows = sum(item["saida"] for item in parsed if item["date"].strftime("%Y-%m") == month)
+    closing_balance = float(ofx_balances["closing_balance"] or 0)
+    opening_balance = closing_balance - file_inflows + file_outflows
+    reconciliation = db.scalar(
+        select(BankReconciliation).where(
+            BankReconciliation.company_id == company.id,
+            BankReconciliation.month == month,
+            BankReconciliation.bank == bank,
+        )
+    )
+    if not reconciliation:
+        reconciliation = BankReconciliation(company_id=company.id, month=month, bank=bank)
+        db.add(reconciliation)
+    reconciliation.opening_balance = opening_balance
+    reconciliation.closing_balance_informed = closing_balance
+    reconciliation.notes = (
+        f"Saldos puxados automaticamente do OFX {filename} "
+        f"({ofx_balances.get('balance_source') or 'saldo OFX'})."
+    )
+    reconciliation.updated_at = datetime.utcnow()
+    return reconciliation
 
 
 def debt_overdue_days(debt: Debt) -> int:
@@ -503,7 +571,16 @@ async def import_ofx(
     parsed = parse_ofx(content, file.filename or "arquivo.ofx")
     ofx_balances = parse_ofx_balances(content)
     source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
-    batch = ImportBatch(company_id=company.id, filename=file.filename or "arquivo.ofx")
+    filename = file.filename or "arquivo.ofx"
+    batch = ImportBatch(
+        company_id=company.id,
+        filename=filename,
+        bank=source,
+        start_date=ofx_balances.get("start_date"),
+        end_date=ofx_balances.get("end_date"),
+        closing_balance=ofx_balances.get("closing_balance"),
+        balance_source=ofx_balances.get("balance_source") or "",
+    )
     db.add(batch)
     db.flush()
     imported = 0
@@ -519,39 +596,55 @@ async def import_ofx(
         imported += 1
     batch.imported_count = imported
     batch.skipped_count = skipped
-    if source and parsed and ofx_balances.get("closing_balance") is not None:
-        end_date = ofx_balances.get("end_date") or max(item["date"] for item in parsed)
-        month = end_date.strftime("%Y-%m")
-        file_inflows = sum(item["entrada"] for item in parsed if item["date"].strftime("%Y-%m") == month)
-        file_outflows = sum(item["saida"] for item in parsed if item["date"].strftime("%Y-%m") == month)
-        closing_balance = float(ofx_balances["closing_balance"] or 0)
-        opening_balance = closing_balance - file_inflows + file_outflows
-        reconciliation = db.scalar(
-            select(BankReconciliation).where(
-                BankReconciliation.company_id == company.id,
-                BankReconciliation.month == month,
-                BankReconciliation.bank == source,
-            )
-        )
-        if not reconciliation:
-            reconciliation = BankReconciliation(company_id=company.id, month=month, bank=source)
-            db.add(reconciliation)
-        reconciliation.opening_balance = opening_balance
-        reconciliation.closing_balance_informed = closing_balance
-        reconciliation.notes = (
-            f"Saldos puxados automaticamente do OFX {file.filename or 'arquivo.ofx'} "
-            f"({ofx_balances.get('balance_source') or 'saldo OFX'})."
-        )
-        reconciliation.updated_at = datetime.utcnow()
+    reconciliation = update_reconciliation_from_ofx(db, company, source, parsed, ofx_balances, filename)
+    if reconciliation:
+        batch.opening_balance = reconciliation.opening_balance
     db.commit()
-    balance_imported = 1 if source and parsed and ofx_balances.get("closing_balance") is not None else 0
+    balance_imported = 1 if reconciliation else 0
     return RedirectResponse(f"/?tab=extratos&imported={imported}&skipped={skipped}&balance_imported={balance_imported}", status_code=303)
+
+
+@app.post("/import-ofx-balances")
+async def import_ofx_balances_only(
+    request: Request,
+    file: UploadFile = File(...),
+    bank_account: str = Form(""),
+    bank_other: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    content = await file.read()
+    filename = file.filename or "arquivo.ofx"
+    parsed = parse_ofx(content, filename)
+    ofx_balances = parse_ofx_balances(content)
+    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    reconciliation = update_reconciliation_from_ofx(db, company, source, parsed, ofx_balances, filename)
+    db.add(
+        ImportBatch(
+            company_id=company.id,
+            filename=f"SALDOS - {filename}",
+            bank=source,
+            start_date=ofx_balances.get("start_date"),
+            end_date=ofx_balances.get("end_date"),
+            opening_balance=reconciliation.opening_balance if reconciliation else None,
+            closing_balance=ofx_balances.get("closing_balance"),
+            balance_source=ofx_balances.get("balance_source") or "",
+            imported_count=0,
+            skipped_count=len(parsed),
+        )
+    )
+    db.commit()
+    balance_imported = 1 if reconciliation else 0
+    return RedirectResponse(f"/?tab=conciliacao&balance_imported={balance_imported}", status_code=303)
 
 
 @app.post("/transactions/manual")
 def create_manual_transaction(
     request: Request,
-    transaction_date: date = Form(...),
+    transaction_date: str = Form(...),
     history: str = Form(...),
     amount: float = Form(...),
     bank_account: str = Form("Caixa Interno"),
@@ -572,11 +665,14 @@ def create_manual_transaction(
         )
     if not account:
         account = classify_account(db, company.id, history)
-    fingerprint = f"{company.id}|{transaction_date.isoformat()}|{history.strip()}|{amount}|{source}"
+    parsed_date = parse_filter_date(transaction_date)
+    if not parsed_date:
+        return RedirectResponse("/?tab=extratos&date_error=1", status_code=303)
+    fingerprint = f"{company.id}|{parsed_date.isoformat()}|{history.strip()}|{amount}|{source}"
     db.add(
         Transaction(
             company_id=company.id,
-            date=transaction_date,
+            date=parsed_date,
             history=history.strip(),
             bank=source or "Caixa Interno",
             fitid="manual-" + hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
