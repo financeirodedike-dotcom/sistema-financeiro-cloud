@@ -857,40 +857,137 @@
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel hero360">
         <h2>Contas a Receber</h2>
-        <p>Base inicial para acompanhar clientes, vendas faturadas, recebimentos e previsao de entrada.</p>
+        <p>Controle clientes, vendas faturadas, parcelas, vencimentos, quitacoes, atrasos, descontos e juros em uma visao parecida com sua planilha.</p>
         <div class="pillar-grid">
           <div class="pillar"><strong>Receitas importadas</strong><span>{{ dashboard.receitas|brl }}</span></div>
-          <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
-          <div class="pillar"><strong>Em aberto</strong><span>Cadastro em implantacao</span></div>
-          <div class="pillar"><strong>Recebido</strong><span>{{ dashboard.receitas|brl }}</span></div>
-          <div class="pillar"><strong>Status</strong><span>Modulo em implantacao.</span></div>
+          <div class="pillar"><strong>Recebidas em dia</strong><span>{{ receivable_summary.received_on_time|brl }}</span></div>
+          <div class="pillar"><strong>Recebidas em atraso</strong><span>{{ receivable_summary.received_late|brl }}</span></div>
+          <div class="pillar"><strong>Em aberto</strong><span>{{ receivable_summary.open_total|brl }}</span></div>
+          <div class="pillar"><strong>Vencidas</strong><span>{{ receivable_summary.overdue_total|brl }}</span></div>
         </div>
+      </div>
+      <div class="panel">
+        <h2>Novo titulo a receber</h2>
+        <form action="/receivables" method="post">
+          <input name="due_date" type="text" inputmode="numeric" placeholder="Vencimento dd/mm/aaaa">
+          <input name="customer_name" placeholder="Cliente" required>
+          <select name="account_id">
+            <option value="">Plano de conta</option>
+            {% for account in accounts %}
+            <option value="{{ account.id }}">{{ account.name }}</option>
+            {% endfor %}
+          </select>
+          <input name="description" placeholder="Descricao">
+          <input name="document_number" placeholder="Nota fiscal / recibo / pedido">
+          <input name="installment" placeholder="Parcela ex: 01/03">
+          <input name="bank_account" placeholder="Conta/Banco">
+          <select name="status">
+            <option value="Em aberto">Em aberto</option>
+            <option value="Pago em dia">Pago em dia</option>
+            <option value="Pago em atraso">Pago em atraso</option>
+            <option value="Vencido">Vencido</option>
+          </select>
+          <input name="paid_date" type="text" inputmode="numeric" placeholder="Quitacao dd/mm/aaaa">
+          <input name="installment_value" type="number" step="0.01" placeholder="Valor da parcela">
+          <input name="total_value" type="number" step="0.01" placeholder="Valor total da conta">
+          <input name="discount_value" type="number" step="0.01" placeholder="Desconto">
+          <input name="interest_value" type="number" step="0.01" placeholder="Juros">
+          <input name="notes" placeholder="Resumo/observacoes">
+          <button type="submit">Salvar titulo</button>
+        </form>
       </div>
       <div class="two">
         <div class="panel">
-          <h2>Novo titulo a receber</h2>
-          <form action="/" method="get">
-            <input type="hidden" name="tab" value="contas-receber">
-            <input type="text" inputmode="numeric" name="due_date" placeholder="dd/mm/aaaa">
-            <input name="customer" placeholder="Cliente">
-            <input name="description" placeholder="Descricao">
-            <input type="number" step="0.01" name="amount" placeholder="Valor">
-            <button type="submit">Preparar cadastro</button>
-          </form>
+          <h2>Lancamentos a receber</h2>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data vencimento</th>
+                  <th>Cliente</th>
+                  <th>Plano de conta</th>
+                  <th>Descricao</th>
+                  <th>Nota/Recibo/Pedido</th>
+                  <th>Parcela</th>
+                  <th>Conta</th>
+                  <th>Status</th>
+                  <th>Data quitacao</th>
+                  <th>Valor parcela</th>
+                  <th>Valor total conta</th>
+                  <th>Desconto</th>
+                  <th>Juro</th>
+                  <th>Dias em atraso</th>
+                  <th>Total da parcela</th>
+                  <th>Editar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in receivable_rows %}
+                {% set item = row.item %}
+                <tr class="{{ 'classified-row' if row.status.startswith('Pago') else 'pending-row' }}">
+                  <td>{{ item.due_date|date_br }}</td>
+                  <td>{{ item.customer_name }}</td>
+                  <td>{{ item.account.name if item.account else "" }}</td>
+                  <td>{{ item.description }}</td>
+                  <td>{{ item.document_number }}</td>
+                  <td>{{ item.installment }}</td>
+                  <td>{{ item.bank_account }}</td>
+                  <td><span class="pill {{ 'status-ok' if row.status.startswith('Pago') else 'status-pending' }}">{{ row.status }}</span></td>
+                  <td>{{ item.paid_date|date_br }}</td>
+                  <td>{{ item.installment_value|brl }}</td>
+                  <td>{{ item.total_value|brl }}</td>
+                  <td>{{ item.discount_value|brl }}</td>
+                  <td>{{ item.interest_value|brl }}</td>
+                  <td>{{ row.overdue_days }}</td>
+                  <td>{{ row.total|brl }}</td>
+                  <td>
+                    <form action="/receivables/{{ item.id }}/update" method="post">
+                      <select name="status">
+                        <option value="Em aberto" {% if row.status == "Em aberto" %}selected{% endif %}>Em aberto</option>
+                        <option value="Pago em dia" {% if row.status == "Pago em dia" %}selected{% endif %}>Pago em dia</option>
+                        <option value="Pago em atraso" {% if row.status == "Pago em atraso" %}selected{% endif %}>Pago em atraso</option>
+                        <option value="Vencido" {% if row.status == "Vencido" %}selected{% endif %}>Vencido</option>
+                      </select>
+                      <input name="paid_date" type="text" inputmode="numeric" value="{{ item.paid_date|date_br }}" placeholder="Quitacao">
+                      <input name="discount_value" type="number" step="0.01" value="{{ item.discount_value }}">
+                      <input name="interest_value" type="number" step="0.01" value="{{ item.interest_value }}">
+                      <button type="submit">OK</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
         <div class="panel">
-          <h2>Receitas recentes</h2>
+          <h2>Resumo</h2>
           <table>
-            <thead><tr><th>Data</th><th>Historico</th><th>Valor</th></tr></thead>
             <tbody>
-              {% for row in transactions %}
-              {% if row.entrada > 0 %}
-              <tr><td>{{ row.date|date_br }}</td><td>{{ row.history }}</td><td>{{ row.entrada|brl }}</td></tr>
-              {% endif %}
-              {% endfor %}
+              <tr><td>Recebidas em dia</td><td class="positive">{{ receivable_summary.received_on_time|brl }}</td></tr>
+              <tr><td>Recebidas em atraso</td><td>{{ receivable_summary.received_late|brl }}</td></tr>
+              <tr><td>Em aberto</td><td>{{ receivable_summary.open_total|brl }}</td></tr>
+              <tr><td>Vencidos</td><td class="negative">{{ receivable_summary.overdue_total|brl }}</td></tr>
+              <tr><td>Total de descontos</td><td>{{ receivable_summary.discount_total|brl }}</td></tr>
+              <tr><td>Total de juros</td><td>{{ receivable_summary.interest_total|brl }}</td></tr>
+              <tr><td>Quantidade de titulos</td><td>{{ receivable_summary.count }}</td></tr>
             </tbody>
           </table>
+          <p class="muted">O status tambem e recalculado pela data: se nao foi quitado e passou do vencimento, aparece como vencido.</p>
         </div>
+      </div>
+      <div class="panel">
+        <h2>Receitas recentes dos extratos</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Historico</th><th>Valor</th></tr></thead>
+          <tbody>
+            {% for row in transactions %}
+            {% if row.entrada > 0 %}
+            <tr><td>{{ row.date|date_br }}</td><td>{{ row.history }}</td><td>{{ row.entrada|brl }}</td></tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </section>
 

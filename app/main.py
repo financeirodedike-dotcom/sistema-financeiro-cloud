@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Supplier, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, User
 from app.ofx_parser import parse_ofx, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -210,6 +210,27 @@ def debt_overdue_days(debt: Debt) -> int:
     if not debt.due_date or debt.status != "Ativo":
         return 0
     return max((date.today() - debt.due_date).days, 0)
+
+
+def receivable_status(row: Receivable) -> str:
+    if row.paid_date:
+        if row.due_date and row.paid_date > row.due_date:
+            return "Pago em atraso"
+        return "Pago em dia"
+    if row.due_date and row.due_date < date.today():
+        return "Vencido"
+    return row.status or "Em aberto"
+
+
+def receivable_overdue_days(row: Receivable) -> int:
+    if not row.due_date:
+        return 0
+    reference_date = row.paid_date or date.today()
+    return max((reference_date - row.due_date).days, 0)
+
+
+def receivable_total(row: Receivable) -> float:
+    return (row.installment_value or 0) - (row.discount_value or 0) + (row.interest_value or 0)
 
 
 def normalize_account_name(name: str) -> str:
@@ -442,6 +463,25 @@ def home(request: Request, db: Session = Depends(get_db)):
     ).all()
     customers = db.scalars(select(Customer).where(Customer.company_id == company.id).order_by(Customer.created_at.desc())).all()
     suppliers = db.scalars(select(Supplier).where(Supplier.company_id == company.id).order_by(Supplier.created_at.desc())).all()
+    receivables = db.scalars(select(Receivable).where(Receivable.company_id == company.id).order_by(Receivable.due_date.desc(), Receivable.created_at.desc())).all()
+    receivable_rows = [
+        {
+            "item": row,
+            "status": receivable_status(row),
+            "overdue_days": receivable_overdue_days(row),
+            "total": receivable_total(row),
+        }
+        for row in receivables
+    ]
+    receivable_summary = {
+        "received_on_time": sum(item["total"] for item in receivable_rows if item["status"] == "Pago em dia"),
+        "received_late": sum(item["total"] for item in receivable_rows if item["status"] == "Pago em atraso"),
+        "open_total": sum(item["total"] for item in receivable_rows if item["status"] == "Em aberto"),
+        "overdue_total": sum(item["total"] for item in receivable_rows if item["status"] == "Vencido"),
+        "discount_total": sum(row.discount_value or 0 for row in receivables),
+        "interest_total": sum(row.interest_value or 0 for row in receivables),
+        "count": len(receivables),
+    }
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     current_user_membership = current_membership(user, company, db)
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
@@ -507,6 +547,8 @@ def home(request: Request, db: Session = Depends(get_db)):
             "user_memberships": user_memberships,
             "customers": customers,
             "suppliers": suppliers,
+            "receivable_rows": receivable_rows,
+            "receivable_summary": receivable_summary,
             "registry_summary": {
                 "customers": len(customers),
                 "active_customers": sum(1 for row in customers if row.status == "Ativo"),
@@ -651,7 +693,7 @@ def create_manual_transaction(
     amount: float = Form(...),
     bank_account: str = Form("Caixa Interno"),
     bank_other: str = Form(""),
-    account_id: int | None = Form(None),
+    account_id: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -906,6 +948,78 @@ def create_supplier(
     supplier.notes = notes.strip()
     db.commit()
     return RedirectResponse("/?tab=cadastros", status_code=303)
+
+
+@app.post("/receivables")
+def create_receivable(
+    request: Request,
+    due_date: str = Form(""),
+    customer_name: str = Form(...),
+    account_id: int | None = Form(None),
+    description: str = Form(""),
+    document_number: str = Form(""),
+    installment: str = Form(""),
+    bank_account: str = Form(""),
+    status: str = Form("Em aberto"),
+    paid_date: str = Form(""),
+    installment_value: float = Form(0),
+    total_value: float = Form(0),
+    discount_value: float = Form(0),
+    interest_value: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    allowed_status = {"Em aberto", "Pago em dia", "Pago em atraso", "Vencido"}
+    db.add(
+        Receivable(
+            company_id=company.id,
+            due_date=parse_filter_date(due_date),
+            customer_name=customer_name.strip(),
+            account_id=int(account_id) if account_id else None,
+            description=description.strip(),
+            document_number=document_number.strip(),
+            installment=installment.strip(),
+            bank_account=bank_account.strip(),
+            status=status if status in allowed_status else "Em aberto",
+            paid_date=parse_filter_date(paid_date),
+            installment_value=installment_value,
+            total_value=total_value or installment_value,
+            discount_value=discount_value,
+            interest_value=interest_value,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse("/?tab=contas-receber", status_code=303)
+
+
+@app.post("/receivables/{receivable_id}/update")
+def update_receivable(
+    request: Request,
+    receivable_id: int,
+    status: str = Form("Em aberto"),
+    paid_date: str = Form(""),
+    discount_value: float = Form(0),
+    interest_value: float = Form(0),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    row = db.scalar(select(Receivable).where(Receivable.company_id == company.id, Receivable.id == receivable_id))
+    allowed_status = {"Em aberto", "Pago em dia", "Pago em atraso", "Vencido"}
+    if row:
+        row.status = status if status in allowed_status else row.status
+        row.paid_date = parse_filter_date(paid_date)
+        row.discount_value = discount_value
+        row.interest_value = interest_value
+        db.commit()
+    return RedirectResponse("/?tab=contas-receber", status_code=303)
 
 
 @app.post("/debts")

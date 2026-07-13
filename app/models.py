@@ -201,6 +201,31 @@ class Supplier(Base):
     company: Mapped[Company] = relationship()
 
 
+class Receivable(Base):
+    __tablename__ = "receivables"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    customer_name: Mapped[str] = mapped_column(String(160), index=True)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("financial_accounts.id"), nullable=True)
+    description: Mapped[str] = mapped_column(String(240), default="")
+    document_number: Mapped[str] = mapped_column(String(80), default="")
+    installment: Mapped[str] = mapped_column(String(40), default="")
+    bank_account: Mapped[str] = mapped_column(String(120), default="")
+    status: Mapped[str] = mapped_column(String(40), default="Em aberto")
+    paid_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    installment_value: Mapped[float] = mapped_column(Float, default=0)
+    total_value: Mapped[float] = mapped_column(Float, default=0)
+    discount_value: Mapped[float] = mapped_column(Float, default=0)
+    interest_value: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    account: Mapped[FinancialAccount | None] = relationship()
+
+
 class Debt(Base):
     __tablename__ = "debts"
 
