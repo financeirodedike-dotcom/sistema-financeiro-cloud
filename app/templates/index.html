@@ -975,37 +975,40 @@
       <div class="panel">
         <h2>Fluxo de Caixa</h2>
         <div class="grid">
+          <div class="kpi"><span>Saldo inicial</span><strong class="{{ 'negative' if cashflow_totals.saldo_inicial < 0 else 'positive' }}">{{ cashflow_totals.saldo_inicial|brl }}</strong></div>
           <div class="kpi"><span>Total de entradas</span><strong>{{ cashflow_totals.entradas|brl }}</strong></div>
           <div class="kpi"><span>Total de saidas</span><strong>{{ cashflow_totals.saidas|brl }}</strong></div>
           <div class="kpi"><span>Saldo do periodo</span><strong class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</strong></div>
-          <div class="kpi"><span>Saldo acumulado</span><strong class="{{ 'negative' if cashflow_totals.saldo_acumulado < 0 else 'positive' }}">{{ cashflow_totals.saldo_acumulado|brl }}</strong></div>
+          <div class="kpi"><span>Saldo final</span><strong class="{{ 'negative' if cashflow_totals.saldo_final < 0 else 'positive' }}">{{ cashflow_totals.saldo_final|brl }}</strong></div>
         </div>
         <div class="panel insight">
           <h2>Por que existe diferenca?</h2>
-          <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
-          <p class="muted">{{ cashflow_explanation }} Essa diferenca e o saldo do periodo. O saldo acumulado soma o resultado de todos os meses exibidos.</p>
+          <p class="money-formula">Saldo inicial {{ cashflow_totals.saldo_inicial|brl }} + Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = Saldo final {{ cashflow_totals.saldo_final|brl }}</p>
+          <p class="muted">{{ cashflow_explanation }} Essa diferenca e o saldo do periodo. Quando houver saldo inicial vindo da conciliacao/OFX, ele entra na conta do saldo final.</p>
         </div>
         <p class="muted">Valores em padrao financeiro brasileiro: R$ 1.234,56.</p>
         <table>
-          <thead><tr><th>Mes</th><th>Entradas</th><th>Saidas</th><th>Saldo mes</th><th>Saldo acumulado</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Saldo inicial</th><th>Entradas</th><th>Saidas</th><th>Saldo mes</th><th>Saldo final</th></tr></thead>
           <tbody>
             {% for row in cashflow %}
             <tr>
               <td>{{ row.month|month_br }}</td>
+              <td class="{{ 'negative' if row.saldo_inicial < 0 else 'positive' }}">{{ row.saldo_inicial|brl }}{% if row.saldo_inicial_informado %} <span class="pill">OFX</span>{% endif %}</td>
               <td>{{ row.entradas|brl }}</td>
               <td>{{ row.saidas|brl }}</td>
               <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">{{ row.saldo_mes|brl }}</td>
-              <td class="{{ 'negative' if row.saldo_acumulado < 0 else 'positive' }}">{{ row.saldo_acumulado|brl }}</td>
+              <td class="{{ 'negative' if row.saldo_final < 0 else 'positive' }}">{{ row.saldo_final|brl }}</td>
             </tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr>
               <td>Total do periodo</td>
+              <td>{{ cashflow_totals.saldo_inicial|brl }}</td>
               <td>{{ cashflow_totals.entradas|brl }}</td>
               <td>{{ cashflow_totals.saidas|brl }}</td>
               <td class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</td>
-              <td class="{{ 'negative' if cashflow_totals.saldo_acumulado < 0 else 'positive' }}">{{ cashflow_totals.saldo_acumulado|brl }}</td>
+              <td class="{{ 'negative' if cashflow_totals.saldo_final < 0 else 'positive' }}">{{ cashflow_totals.saldo_final|brl }}</td>
             </tr>
           </tfoot>
         </table>

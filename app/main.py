@@ -480,10 +480,12 @@ def home(request: Request, db: Session = Depends(get_db)):
             selected_debt = None
     cashflow_report = monthly_cashflow(db, company.id)
     cashflow_totals = {
+        "saldo_inicial": cashflow_report[0]["saldo_inicial"] if cashflow_report else 0,
         "entradas": sum(row["entradas"] for row in cashflow_report),
         "saidas": sum(row["saidas"] for row in cashflow_report),
         "saldo_periodo": sum(row["saldo_mes"] for row in cashflow_report),
         "saldo_acumulado": cashflow_report[-1]["saldo_acumulado"] if cashflow_report else 0,
+        "saldo_final": cashflow_report[-1]["saldo_final"] if cashflow_report else 0,
     }
     cashflow_explanation = (
         "As saidas do periodo ficaram maiores que as entradas."

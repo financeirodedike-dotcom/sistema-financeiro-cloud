@@ -24,25 +24,36 @@ def dashboard(db: Session, company_id: int) -> dict:
 
 def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    reconciliations = db.scalars(
+        select(BankReconciliation).where(BankReconciliation.company_id == company_id)
+    ).all()
     by_month = defaultdict(lambda: {"entradas": 0, "saidas": 0})
+    opening_by_month = defaultdict(float)
     for row in rows:
         key = row.date.strftime("%Y-%m")
         by_month[key]["entradas"] += row.entrada
         by_month[key]["saidas"] += row.saida
+    for reconciliation in reconciliations:
+        opening_by_month[reconciliation.month] += reconciliation.opening_balance or 0
+
     saldo = 0
     output = []
     for month in sorted(by_month):
+        saldo_inicial = opening_by_month[month] if month in opening_by_month else saldo
         entradas = by_month[month]["entradas"]
         saidas = by_month[month]["saidas"]
         saldo_mes = entradas - saidas
-        saldo += saldo_mes
+        saldo = saldo_inicial + saldo_mes
         output.append(
             {
                 "month": month,
+                "saldo_inicial": saldo_inicial,
                 "entradas": entradas,
                 "saidas": saidas,
                 "saldo_mes": saldo_mes,
                 "saldo_acumulado": saldo,
+                "saldo_final": saldo,
+                "saldo_inicial_informado": month in opening_by_month,
             }
         )
     return output
