@@ -49,9 +49,11 @@
       gap: 16px;
       align-items: center;
       box-shadow: 0 14px 34px rgba(6,21,34,.20);
-      margin-left: 240px;
+      margin-left: 116px;
       min-height: 82px;
+      transition: margin-left .22s ease;
     }
+    body:has(.tabs:hover) header { margin-left: 292px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark {
       width: 50px;
@@ -72,8 +74,10 @@
       display: grid;
       gap: 16px;
       max-width: 1920px;
-      margin: 0 auto 0 240px;
+      margin: 0 auto 0 116px;
+      transition: margin-left .22s ease;
     }
+    body:has(.tabs:hover) main { margin-left: 292px; }
     .tabs {
       position: fixed;
       top: 18px;
@@ -84,28 +88,41 @@
       flex-direction: column;
       gap: 8px;
       overflow-y: auto;
-      width: 204px;
+      width: 78px;
       background: linear-gradient(180deg, #2147ff, #1430c8);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255,255,255,.22);
       border-radius: 22px;
       padding: 18px 12px;
       box-shadow: 0 22px 48px rgba(20,48,200,.24);
+      transition: width .22s ease, box-shadow .22s ease;
+    }
+    .tabs:hover {
+      width: 256px;
+      box-shadow: 0 26px 56px rgba(20,48,200,.30);
     }
     .tabs::before {
-      content: "Business360";
+      content: "360";
       display: grid;
       place-items: center;
-      width: 76px;
-      height: 76px;
+      width: 48px;
+      height: 48px;
       margin: 0 auto 8px;
-      border-radius: 24px;
+      border-radius: 16px;
       background: rgba(255,255,255,.12);
       color: white;
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 900;
       border: 1px solid rgba(255,255,255,.26);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+      transition: width .22s ease, height .22s ease, border-radius .22s ease, font-size .22s ease;
+    }
+    .tabs:hover::before {
+      content: "Business360 AI";
+      width: 172px;
+      height: 58px;
+      border-radius: 18px;
+      font-size: 15px;
     }
     .tabs::after {
       content: "Menu principal";
@@ -117,20 +134,35 @@
       text-transform: uppercase;
       letter-spacing: .08em;
       padding: 0 10px 2px;
+      opacity: 0;
+      white-space: nowrap;
+      transition: opacity .18s ease;
     }
+    .tabs:hover::after { opacity: 1; }
     .tabs label {
       display: flex;
       align-items: center;
+      justify-content: center;
       min-height: 42px;
-      padding: 10px 12px;
+      padding: 10px 8px;
       border-radius: 12px;
       color: rgba(255,255,255,.88);
       font-weight: 800;
       cursor: pointer;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+      font-size: 0;
       border: 1px solid rgba(255,255,255,.08);
       transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
     }
+    .tabs label::first-letter { font-size: 15px; }
+    .tabs:hover label {
+      justify-content: flex-start;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .tabs:hover label::first-letter { font-size: inherit; }
     .tabs label:hover {
       background: rgba(255,255,255,.13);
       border-color: rgba(255,255,255,.24);
@@ -376,6 +408,10 @@
       #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
       #tab-antecipacoes:checked ~ .tabs label[for="tab-antecipacoes"],
       #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: var(--blue); color: white; box-shadow: 0 8px 20px rgba(18,53,91,.18); border-color: var(--blue); }
+      .tabs:hover { width: auto; box-shadow: 0 8px 18px rgba(15,35,55,.04); }
+      .tabs label { font-size: 14px; justify-content: flex-start; padding: 10px 13px; overflow: visible; }
+      .tabs label::first-letter { font-size: inherit; }
+      body:has(.tabs:hover) header, body:has(.tabs:hover) main { margin-left: 0; }
       .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid, .module-hub { grid-template-columns: 1fr; }
     }
   </style>
