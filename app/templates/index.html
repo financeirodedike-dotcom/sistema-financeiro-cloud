@@ -564,6 +564,10 @@
             <button type="submit">Importar arquivo OFX</button>
           </form>
           <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros. O sistema ignora repetidos pelo ID do banco e tambem por data + valor + banco + historico.</p>
+          <p class="muted">Quando o OFX trouxer saldo final do banco, a conciliacao do mes sera preenchida automaticamente.</p>
+          {% if request.query_params.get("balance_imported") == "1" %}
+          <p class="positive">Saldo do OFX importado para a aba Financeiro > Conciliacao.</p>
+          {% endif %}
         </div>
         <div class="panel">
           <h2>Lancamento manual</h2>
@@ -1039,7 +1043,7 @@
             <input name="notes" placeholder="Observacoes">
             <button type="submit">Salvar conciliacao</button>
           </form>
-          <p class="muted">Se o mesmo mes e banco ja existirem, o sistema atualiza os saldos sem duplicar.</p>
+          <p class="muted">Se o mesmo mes e banco ja existirem, o sistema atualiza os saldos sem duplicar. Quando o OFX trouxer saldo final, esses campos podem ser preenchidos automaticamente na importacao.</p>
         </div>
         <div class="panel insight">
           <h2>Como interpretar</h2>

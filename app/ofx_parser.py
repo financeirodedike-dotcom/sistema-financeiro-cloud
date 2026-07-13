@@ -24,7 +24,7 @@ def _amount(value: str) -> float:
         return 0.0
 
 
-def parse_ofx(content: bytes, filename: str) -> list[dict]:
+def _decode(content: bytes) -> str:
     text = None
     for encoding in ("utf-8-sig", "cp1252", "latin1"):
         try:
@@ -34,6 +34,28 @@ def parse_ofx(content: bytes, filename: str) -> list[dict]:
             continue
     if text is None:
         text = content.decode("latin1", errors="replace")
+    return text
+
+
+def parse_ofx_balances(content: bytes) -> dict:
+    text = _decode(content)
+    start_date = _date(_tag(text, "DTSTART"))
+    end_date = _date(_tag(text, "DTEND"))
+    ledger_block = re.search(r"<LEDGERBAL>(.*?)</LEDGERBAL>", text, flags=re.IGNORECASE | re.DOTALL)
+    available_block = re.search(r"<AVAILBAL>(.*?)</AVAILBAL>", text, flags=re.IGNORECASE | re.DOTALL)
+    balance_block = ledger_block.group(1) if ledger_block else available_block.group(1) if available_block else ""
+    closing_balance = _amount(_tag(balance_block, "BALAMT")) if balance_block else None
+    balance_date = _date(_tag(balance_block, "DTASOF")) if balance_block else None
+    return {
+        "start_date": start_date,
+        "end_date": end_date or balance_date,
+        "closing_balance": closing_balance,
+        "balance_source": "LEDGERBAL" if ledger_block else "AVAILBAL" if available_block else "",
+    }
+
+
+def parse_ofx(content: bytes, filename: str) -> list[dict]:
+    text = _decode(content)
 
     blocks = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", text, flags=re.IGNORECASE | re.DOTALL)
     rows = []

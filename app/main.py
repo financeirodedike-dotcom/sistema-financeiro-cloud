@@ -15,7 +15,7 @@ from app.auth import SESSION_COOKIE, create_session_token, current_company, curr
 from app.classifier import classify_account
 from app.database import get_db, init_db
 from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Supplier, Transaction, User
-from app.ofx_parser import parse_ofx
+from app.ofx_parser import parse_ofx, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
@@ -501,6 +501,7 @@ async def import_ofx(
     _user, company = context
     content = await file.read()
     parsed = parse_ofx(content, file.filename or "arquivo.ofx")
+    ofx_balances = parse_ofx_balances(content)
     source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
     batch = ImportBatch(company_id=company.id, filename=file.filename or "arquivo.ofx")
     db.add(batch)
@@ -518,8 +519,33 @@ async def import_ofx(
         imported += 1
     batch.imported_count = imported
     batch.skipped_count = skipped
+    if source and parsed and ofx_balances.get("closing_balance") is not None:
+        end_date = ofx_balances.get("end_date") or max(item["date"] for item in parsed)
+        month = end_date.strftime("%Y-%m")
+        file_inflows = sum(item["entrada"] for item in parsed if item["date"].strftime("%Y-%m") == month)
+        file_outflows = sum(item["saida"] for item in parsed if item["date"].strftime("%Y-%m") == month)
+        closing_balance = float(ofx_balances["closing_balance"] or 0)
+        opening_balance = closing_balance - file_inflows + file_outflows
+        reconciliation = db.scalar(
+            select(BankReconciliation).where(
+                BankReconciliation.company_id == company.id,
+                BankReconciliation.month == month,
+                BankReconciliation.bank == source,
+            )
+        )
+        if not reconciliation:
+            reconciliation = BankReconciliation(company_id=company.id, month=month, bank=source)
+            db.add(reconciliation)
+        reconciliation.opening_balance = opening_balance
+        reconciliation.closing_balance_informed = closing_balance
+        reconciliation.notes = (
+            f"Saldos puxados automaticamente do OFX {file.filename or 'arquivo.ofx'} "
+            f"({ofx_balances.get('balance_source') or 'saldo OFX'})."
+        )
+        reconciliation.updated_at = datetime.utcnow()
     db.commit()
-    return RedirectResponse(f"/?tab=extratos&imported={imported}&skipped={skipped}", status_code=303)
+    balance_imported = 1 if source and parsed and ofx_balances.get("closing_balance") is not None else 0
+    return RedirectResponse(f"/?tab=extratos&imported={imported}&skipped={skipped}&balance_imported={balance_imported}", status_code=303)
 
 
 @app.post("/transactions/manual")
