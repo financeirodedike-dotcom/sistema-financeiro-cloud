@@ -231,15 +231,20 @@
       <div class="panel insight">
         <h2>Leitura rapida do caixa</h2>
         <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
-        <p class="muted">{{ cashflow_explanation }} Para investigar, entre em Financeiro > Fluxo de Caixa e compare os meses com maior saida.</p>
+        <p class="muted">{{ cashflow_explanation }} A diferenca nao e um erro de formula: ela e a soma liquida dos meses, bancos e contas abaixo. Para bater com o banco, use tambem Financeiro > Conciliacao.</p>
+        <div class="status">
+          <span class="pill">Meses positivos: {{ cashflow_diagnostics.positive_months_total|brl }}</span>
+          <span class="pill">Meses negativos: {{ cashflow_diagnostics.negative_months_total|brl }}</span>
+          <span class="pill">Diferenca liquida: {{ cashflow_diagnostics.net_difference|brl }}</span>
+        </div>
       </div>
-      <div class="two">
+      <div class="three">
         <div class="panel">
-          <h2>Onde esta a diferenca de caixa?</h2>
+          <h2>Diferenca por mes</h2>
           <table>
             <thead><tr><th>Mes</th><th>Entradas</th><th>Saidas</th><th>Saldo</th></tr></thead>
             <tbody>
-              {% for row in cashflow_diagnostics.worst_months %}
+              {% for row in cashflow_diagnostics.month_breakdown %}
               <tr>
                 <td>{{ row.month|month_br }}</td>
                 <td>{{ row.entradas|brl }}</td>
@@ -249,15 +254,37 @@
               {% endfor %}
             </tbody>
           </table>
-          <p class="muted">Esses sao os meses que mais puxaram o saldo para baixo.</p>
+          <p class="muted">Some os saldos dos meses: o resultado fecha com a diferenca do topo.</p>
         </div>
         <div class="panel">
-          <h2>Maiores grupos de saida</h2>
+          <h2>Diferenca por banco/caixa</h2>
           <table>
-            <thead><tr><th>Grupo</th><th>Valor</th></tr></thead>
+            <thead><tr><th>Banco/Caixa</th><th>Entradas</th><th>Saidas</th><th>Saldo</th></tr></thead>
             <tbody>
-              {% for row in cashflow_diagnostics.expense_groups %}
-              <tr><td>{{ row.group }}</td><td>{{ row.value|brl }}</td></tr>
+              {% for row in cashflow_diagnostics.bank_breakdown %}
+              <tr>
+                <td>{{ row.bank }}</td>
+                <td>{{ row.entradas|brl }}</td>
+                <td>{{ row.saidas|brl }}</td>
+                <td class="{{ 'negative' if row.saldo < 0 else 'positive' }}">{{ row.saldo|brl }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="muted">Aqui aparece qual banco ou caixa interno esta concentrando a diferenca.</p>
+        </div>
+        <div class="panel">
+          <h2>Diferenca por conta financeira</h2>
+          <table>
+            <thead><tr><th>Conta</th><th>Entradas</th><th>Saidas</th><th>Saldo</th></tr></thead>
+            <tbody>
+              {% for row in cashflow_diagnostics.account_breakdown %}
+              <tr>
+                <td>{{ row.account }}</td>
+                <td>{{ row.entradas|brl }}</td>
+                <td>{{ row.saidas|brl }}</td>
+                <td class="{{ 'negative' if row.saldo < 0 else 'positive' }}">{{ row.saldo|brl }}</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -265,6 +292,17 @@
           <p class="muted">Ha {{ cashflow_diagnostics.unclassified_outflows|brl }} em saidas ainda a classificar. Isso pode distorcer a leitura por grupo.</p>
           {% endif %}
         </div>
+      </div>
+      <div class="panel">
+        <h2>Maiores grupos de saida</h2>
+        <table>
+          <thead><tr><th>Grupo</th><th>Valor</th></tr></thead>
+          <tbody>
+            {% for row in cashflow_diagnostics.expense_groups %}
+            <tr><td>{{ row.group }}</td><td>{{ row.value|brl }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
       <div class="panel">
         <h2>Centro de Controle Integrado</h2>

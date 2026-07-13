@@ -51,14 +51,24 @@ def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
 def cashflow_diagnostics(db: Session, company_id: int) -> dict:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     by_month = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
+    by_bank = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
+    by_account = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
     by_group = defaultdict(float)
     unclassified_outflows = 0
     for row in rows:
         month = row.date.strftime("%Y-%m")
         movement = row.entrada - row.saida
+        bank = row.bank or "Sem banco/caixa"
+        account_name = row.account.name if row.account else "A CLASSIFICAR"
         by_month[month]["entradas"] += row.entrada
         by_month[month]["saidas"] += row.saida
         by_month[month]["saldo"] += movement
+        by_bank[bank]["entradas"] += row.entrada
+        by_bank[bank]["saidas"] += row.saida
+        by_bank[bank]["saldo"] += movement
+        by_account[account_name]["entradas"] += row.entrada
+        by_account[account_name]["saidas"] += row.saida
+        by_account[account_name]["saldo"] += movement
         if row.saida > 0:
             group = row.account.group_name if row.account else "A CLASSIFICAR"
             by_group[group] += row.saida
@@ -73,10 +83,26 @@ def cashflow_diagnostics(db: Session, company_id: int) -> dict:
         {"group": group, "value": value}
         for group, value in sorted(by_group.items(), key=lambda item: item[1], reverse=True)
     ]
+    bank_rows = [
+        {"bank": bank, **values}
+        for bank, values in sorted(by_bank.items(), key=lambda item: abs(item[1]["saldo"]), reverse=True)
+    ]
+    account_rows = [
+        {"account": account, **values}
+        for account, values in sorted(by_account.items(), key=lambda item: abs(item[1]["saldo"]), reverse=True)
+    ]
+    negative_months_total = sum(row["saldo"] for row in month_rows if row["saldo"] < 0)
+    positive_months_total = sum(row["saldo"] for row in month_rows if row["saldo"] > 0)
     return {
         "worst_months": month_rows[:5],
+        "month_breakdown": month_rows,
+        "bank_breakdown": bank_rows[:10],
+        "account_breakdown": account_rows[:10],
         "expense_groups": group_rows[:6],
         "unclassified_outflows": unclassified_outflows,
+        "negative_months_total": negative_months_total,
+        "positive_months_total": positive_months_total,
+        "net_difference": positive_months_total + negative_months_total,
     }
 
 
