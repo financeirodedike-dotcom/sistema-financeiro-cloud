@@ -5,15 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Criar conta - Business360 AI</title>
   <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Arial, sans-serif; background: linear-gradient(120deg, #061522, #12355b 58%, #0c8ec4); color: #172033; }
-    .box { width: min(480px, calc(100% - 32px)); background: white; border: 1px solid #d8dee9; border-radius: 8px; padding: 24px; }
-    h1 { margin: 0 0 6px; color: #12355b; }
-    p { margin: 0 0 18px; color: #667085; }
-    form { display: grid; gap: 10px; }
-    input, button { padding: 11px 12px; border: 1px solid #d8dee9; border-radius: 6px; font-size: 15px; }
-    button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
-    a { color: #0f766e; font-weight: 700; text-decoration: none; }
-    .foot { margin-top: 14px; font-size: 14px; }
+    :root { --blue: #12355b; --teal: #0f766e; --line: #d9e2ec; --text: #111827; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Inter, "Segoe UI", Arial, sans-serif; background: radial-gradient(circle at 20% 20%, rgba(76,201,240,.18), transparent 26rem), linear-gradient(120deg, #061522, #12355b 58%, #0b7fab); color: var(--text); padding: 24px; }
+    .box { width: min(500px, 100%); background: rgba(255,255,255,.98); border: 1px solid rgba(255,255,255,.48); border-radius: 14px; padding: 28px; box-shadow: 0 24px 60px rgba(6,21,34,.28); }
+    h1 { margin: 0 0 6px; color: var(--blue); font-size: 27px; letter-spacing: -.02em; }
+    p { margin: 0 0 20px; color: var(--muted); }
+    form { display: grid; gap: 11px; }
+    input, button { padding: 12px 13px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; }
+    input:focus { outline: 2px solid rgba(15,118,110,.16); border-color: var(--teal); }
+    button { background: linear-gradient(180deg, #0d9488, var(--teal)); color: white; font-weight: 800; cursor: pointer; border: 0; box-shadow: 0 10px 22px rgba(15,118,110,.2); }
+    a { color: var(--teal); font-weight: 800; text-decoration: none; }
+    .foot { margin-top: 16px; font-size: 14px; color: var(--muted); }
   </style>
 </head>
 <body>
