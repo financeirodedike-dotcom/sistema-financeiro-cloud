@@ -140,6 +140,22 @@ class CashflowPlan(Base):
     company: Mapped[Company] = relationship()
 
 
+class BankReconciliation(Base):
+    __tablename__ = "bank_reconciliations"
+    __table_args__ = (UniqueConstraint("company_id", "month", "bank", name="uq_reconciliation_company_month_bank"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    bank: Mapped[str] = mapped_column(String(160), index=True)
+    opening_balance: Mapped[float] = mapped_column(Float, default=0)
+    closing_balance_informed: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class Customer(Base):
     __tablename__ = "customers"
 

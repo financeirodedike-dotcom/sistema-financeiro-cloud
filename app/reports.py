@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CashflowPlan, Debt, FinancialAccount, Transaction
+from app.models import BankReconciliation, CashflowPlan, Debt, FinancialAccount, Transaction
 
 
 def dashboard(db: Session, company_id: int) -> dict:
@@ -117,6 +117,50 @@ def planned_cashflow(db: Session, company_id: int) -> dict:
         "variance": sum(row["variance"] for row in rows),
     }
     return {"rows": rows, "totals": totals}
+
+
+def bank_reconciliation_report(db: Session, company_id: int) -> dict:
+    transactions = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    reconciliations = db.scalars(
+        select(BankReconciliation).where(BankReconciliation.company_id == company_id).order_by(BankReconciliation.month.desc(), BankReconciliation.bank)
+    ).all()
+    movement_by_key = defaultdict(lambda: {"entradas": 0, "saidas": 0})
+    for row in transactions:
+        key = (row.date.strftime("%Y-%m"), row.bank or "Sem banco")
+        movement_by_key[key]["entradas"] += row.entrada
+        movement_by_key[key]["saidas"] += row.saida
+
+    reconciliation_by_key = {(row.month, row.bank): row for row in reconciliations}
+    keys = sorted(set(movement_by_key) | set(reconciliation_by_key), reverse=True)
+    rows = []
+    for month, bank in keys:
+        movement = movement_by_key.get((month, bank), {"entradas": 0, "saidas": 0})
+        reconciliation = reconciliation_by_key.get((month, bank))
+        opening = reconciliation.opening_balance if reconciliation else 0
+        informed = reconciliation.closing_balance_informed if reconciliation else 0
+        calculated = opening + movement["entradas"] - movement["saidas"]
+        difference = informed - calculated
+        rows.append(
+            {
+                "month": month,
+                "bank": bank,
+                "opening_balance": opening,
+                "entradas": movement["entradas"],
+                "saidas": movement["saidas"],
+                "calculated_closing": calculated,
+                "informed_closing": informed,
+                "difference": difference,
+                "has_informed_balance": reconciliation is not None,
+                "notes": reconciliation.notes if reconciliation else "",
+            }
+        )
+    totals = {
+        "entradas": sum(row["entradas"] for row in rows),
+        "saidas": sum(row["saidas"] for row in rows),
+        "difference": sum(row["difference"] for row in rows if row["has_informed_balance"]),
+        "pending": sum(1 for row in rows if not row["has_informed_balance"]),
+    }
+    return {"rows": rows[:120], "totals": totals}
 
 
 def dre(db: Session, company_id: int) -> list[dict]:

@@ -26,6 +26,7 @@
     #tab-compras:checked ~ .tabs label[for="tab-compras"],
     #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
     #tab-caixa-planejado:checked ~ .tabs label[for="tab-caixa-planejado"],
+    #tab-conciliacao:checked ~ .tabs label[for="tab-conciliacao"],
     #tab-dre:checked ~ .tabs label[for="tab-dre"],
     #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
     #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"],
@@ -47,6 +48,7 @@
     #tab-compras:checked ~ main #compras,
     #tab-fluxo:checked ~ main #fluxo,
     #tab-caixa-planejado:checked ~ main #caixa-planejado,
+    #tab-conciliacao:checked ~ main #conciliacao,
     #tab-dre:checked ~ main #dre,
     #tab-balanco:checked ~ main #balanco,
     #tab-endividamento:checked ~ main #endividamento,
@@ -177,6 +179,7 @@
   <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
   <input id="tab-fluxo" name="tab" type="radio" {% if active_tab == "fluxo" %}checked{% endif %}>
   <input id="tab-caixa-planejado" name="tab" type="radio" {% if active_tab == "caixa-planejado" %}checked{% endif %}>
+  <input id="tab-conciliacao" name="tab" type="radio" {% if active_tab == "conciliacao" %}checked{% endif %}>
   <input id="tab-dre" name="tab" type="radio" {% if active_tab == "dre" %}checked{% endif %}>
   <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
   <input id="tab-endividamento" name="tab" type="radio" {% if active_tab == "endividamento" %}checked{% endif %}>
@@ -469,6 +472,7 @@
           <a class="finance-tab" href="/?tab=contas-receber"><span>07</span> Contas a Receber</a>
           <a class="finance-tab" href="/?tab=antecipacoes"><span>08</span> Antecipacoes</a>
           <a class="finance-tab" href="/?tab=caixa-planejado"><span>09</span> Caixa Planejado</a>
+          <a class="finance-tab" href="/?tab=conciliacao"><span>10</span> Conciliacao</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
@@ -487,6 +491,10 @@
           <a class="module-card" href="/?tab=caixa-planejado">
             <strong>Caixa Planejado</strong>
             <span>Registre entradas e saidas orcadas por mes e compare com o realizado.</span>
+          </a>
+          <a class="module-card" href="/?tab=conciliacao">
+            <strong>Conciliacao Bancaria</strong>
+            <span>Informe saldo inicial e final do banco para validar se o caixa fecha.</span>
           </a>
           <a class="module-card" href="/?tab=dre">
             <strong>DRE</strong>
@@ -555,7 +563,7 @@
             <input type="file" name="file" accept=".ofx" required>
             <button type="submit">Importar arquivo OFX</button>
           </form>
-          <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros.</p>
+          <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros. O sistema ignora repetidos pelo ID do banco e tambem por data + valor + banco + historico.</p>
         </div>
         <div class="panel">
           <h2>Lancamento manual</h2>
@@ -994,6 +1002,75 @@
               <td class="{{ 'negative' if row.actual_balance < 0 else 'positive' }}">{{ row.actual_balance|brl }}</td>
               <td class="{{ 'negative' if row.variance < 0 else 'positive' }}">{{ row.variance|brl }}</td>
               <td>{{ row.notes }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="conciliacao" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="panel hero360">
+        <h2>Conciliacao Bancaria</h2>
+        <p>Confira o caixa usando a formula: saldo inicial + entradas - saidas = saldo final calculado. Depois compare com o saldo final informado pelo banco.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Entradas conciliadas</strong><span>{{ bank_reconciliation.totals.entradas|brl }}</span></div>
+          <div class="pillar"><strong>Saidas conciliadas</strong><span>{{ bank_reconciliation.totals.saidas|brl }}</span></div>
+          <div class="pillar"><strong>Diferenca informada</strong><span>{{ bank_reconciliation.totals.difference|brl }}</span></div>
+          <div class="pillar"><strong>Periodos sem saldo</strong><span>{{ bank_reconciliation.totals.pending }}</span></div>
+          <div class="pillar"><strong>Regra</strong><span>Banco precisa bater com o saldo calculado.</span></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Informar saldo do banco</h2>
+          <form action="/bank-reconciliations" method="post">
+            <input name="month" type="month" required>
+            <select name="bank_account" required>
+              <option value="">Escolha banco/caixa</option>
+              {% for source in bank_sources %}
+              <option value="{{ source }}">{{ source }}</option>
+              {% endfor %}
+            </select>
+            <input name="bank_other" placeholder="Outro banco, se necessario">
+            <input name="opening_balance" type="number" step="0.01" placeholder="Saldo inicial do banco">
+            <input name="closing_balance_informed" type="number" step="0.01" placeholder="Saldo final informado pelo banco">
+            <input name="notes" placeholder="Observacoes">
+            <button type="submit">Salvar conciliacao</button>
+          </form>
+          <p class="muted">Se o mesmo mes e banco ja existirem, o sistema atualiza os saldos sem duplicar.</p>
+        </div>
+        <div class="panel insight">
+          <h2>Como interpretar</h2>
+          <p class="money-formula">Saldo inicial + Entradas - Saidas = Saldo final calculado</p>
+          <p class="muted">Se a diferenca for zero, o extrato importado bate com o saldo do banco. Se houver diferenca, falta importacao, existe duplicidade, banco/caixa errado ou transferencia classificada incorretamente.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Resultado da conciliacao</h2>
+        <table>
+          <thead><tr><th>Mes</th><th>Banco/Caixa</th><th>Saldo inicial</th><th>Entradas</th><th>Saidas</th><th>Saldo final calculado</th><th>Saldo final informado</th><th>Diferenca</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for row in bank_reconciliation.rows %}
+            <tr>
+              <td>{{ row.month }}</td>
+              <td>{{ row.bank }}</td>
+              <td>{{ row.opening_balance|brl }}</td>
+              <td>{{ row.entradas|brl }}</td>
+              <td>{{ row.saidas|brl }}</td>
+              <td class="{{ 'negative' if row.calculated_closing < 0 else 'positive' }}">{{ row.calculated_closing|brl }}</td>
+              <td>{{ row.informed_closing|brl }}</td>
+              <td class="{{ 'negative' if row.difference != 0 else 'positive' }}">{{ row.difference|brl }}</td>
+              <td>
+                {% if not row.has_informed_balance %}
+                <span class="pill status-pending">Informar saldo</span>
+                {% elif row.difference > -0.01 and row.difference < 0.01 %}
+                <span class="pill status-ok">Fechado</span>
+                {% else %}
+                <span class="pill status-pending">Divergente</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>

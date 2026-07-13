@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Supplier, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Supplier, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import balance_sheet, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
+from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
 app = FastAPI(title="Business360 AI")
@@ -156,6 +156,36 @@ def account_dedupe_key(name: str) -> str:
 def safe_upload_filename(filename: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", filename.strip())
     return cleaned[:160] or "arquivo"
+
+
+def normalize_history(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
+    return " ".join(re.sub(r"[^A-Za-z0-9]+", " ", without_accents.upper()).split())
+
+
+def duplicate_transaction_exists(db: Session, company_id: int, item: dict, bank: str) -> bool:
+    if item.get("fitid"):
+        exists_by_fitid = db.scalar(
+            select(Transaction).where(
+                Transaction.company_id == company_id,
+                Transaction.fitid == item["fitid"],
+                Transaction.amount == item["amount"],
+                Transaction.date == item["date"],
+            )
+        )
+        if exists_by_fitid:
+            return True
+    same_day_amount_bank = db.scalars(
+        select(Transaction).where(
+            Transaction.company_id == company_id,
+            Transaction.date == item["date"],
+            Transaction.amount == item["amount"],
+            Transaction.bank == bank,
+        )
+    ).all()
+    incoming_history = normalize_history(item.get("history", ""))
+    return any(normalize_history(row.history) == incoming_history for row in same_day_amount_bank)
 
 
 def seed_company_accounts(db: Session, company: Company) -> None:
@@ -448,6 +478,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "cashflow_diagnostics": cashflow_diagnostics(db, company.id),
             "cashflow_explanation": cashflow_explanation,
             "planned_cashflow": planned_cashflow(db, company.id),
+            "bank_reconciliation": bank_reconciliation_report(db, company.id),
             "dre": dre(db, company.id),
             "balance": balance_sheet(db, company.id),
             "purchases": purchases_report,
@@ -477,21 +508,11 @@ async def import_ofx(
     imported = 0
     skipped = 0
     for item in parsed:
-        exists = None
-        if item.get("fitid"):
-            exists = db.scalar(
-                select(Transaction).where(
-                    Transaction.company_id == company.id,
-                    Transaction.fitid == item["fitid"],
-                    Transaction.amount == item["amount"],
-                    Transaction.date == item["date"],
-                )
-            )
-        if exists:
-            skipped += 1
-            continue
         if source:
             item["bank"] = source
+        if duplicate_transaction_exists(db, company.id, item, item.get("bank", "")):
+            skipped += 1
+            continue
         account = classify_account(db, company.id, item["history"])
         db.add(Transaction(**item, company_id=company.id, import_batch_id=batch.id, account=account))
         imported += 1
@@ -877,6 +898,42 @@ def save_cashflow_plan(
         )
     db.commit()
     return RedirectResponse("/?tab=caixa-planejado", status_code=303)
+
+
+@app.post("/bank-reconciliations")
+def save_bank_reconciliation(
+    request: Request,
+    month: str = Form(...),
+    bank_account: str = Form(...),
+    bank_other: str = Form(""),
+    opening_balance: float = Form(0),
+    closing_balance_informed: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    bank = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    if not bank:
+        return RedirectResponse("/?tab=conciliacao", status_code=303)
+    reconciliation = db.scalar(
+        select(BankReconciliation).where(
+            BankReconciliation.company_id == company.id,
+            BankReconciliation.month == month,
+            BankReconciliation.bank == bank,
+        )
+    )
+    if not reconciliation:
+        reconciliation = BankReconciliation(company_id=company.id, month=month, bank=bank)
+        db.add(reconciliation)
+    reconciliation.opening_balance = opening_balance
+    reconciliation.closing_balance_informed = closing_balance_informed
+    reconciliation.notes = notes.strip()
+    reconciliation.updated_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse("/?tab=conciliacao", status_code=303)
 
 
 @app.post("/transactions/bulk-classify")
