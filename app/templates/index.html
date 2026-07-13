@@ -20,6 +20,7 @@
     .tab { display: none; }
     #tab-dashboard:checked ~ .tabs label[for="tab-dashboard"],
     #tab-financeiro:checked ~ .tabs label[for="tab-financeiro"],
+    #tab-cadastros:checked ~ .tabs label[for="tab-cadastros"],
     #tab-extratos:checked ~ .tabs label[for="tab-extratos"],
     #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
     #tab-compras:checked ~ .tabs label[for="tab-compras"],
@@ -40,6 +41,7 @@
     #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: var(--blue); color: white; box-shadow: 0 8px 20px rgba(18,53,91,.18); }
     #tab-dashboard:checked ~ main #dashboard,
     #tab-financeiro:checked ~ main #financeiro,
+    #tab-cadastros:checked ~ main #cadastros,
     #tab-extratos:checked ~ main #extratos,
     #tab-classificacao:checked ~ main #classificacao,
     #tab-compras:checked ~ main #compras,
@@ -169,6 +171,7 @@
 
   <input id="tab-dashboard" name="tab" type="radio" {% if active_tab == "dashboard" %}checked{% endif %}>
   <input id="tab-financeiro" name="tab" type="radio" {% if active_tab == "financeiro" %}checked{% endif %}>
+  <input id="tab-cadastros" name="tab" type="radio" {% if active_tab == "cadastros" %}checked{% endif %}>
   <input id="tab-extratos" name="tab" type="radio" {% if active_tab == "extratos" %}checked{% endif %}>
   <input id="tab-classificacao" name="tab" type="radio" {% if active_tab == "classificacao" %}checked{% endif %}>
   <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
@@ -191,6 +194,7 @@
   <nav class="tabs">
     <label for="tab-dashboard">Centro de Controle</label>
     <label for="tab-financeiro">Financeiro</label>
+    <label for="tab-cadastros">Cadastros</label>
     <label for="tab-compras">Compras</label>
     <label for="tab-balanco">Balanco</label>
     <label for="tab-fiscal">Fiscal</label>
@@ -263,6 +267,7 @@
         <h2>Centro de Controle Integrado</h2>
         <div class="module-hub">
           <a class="hub-card" href="/?tab=financeiro"><strong>Financeiro</strong><span>Resumo, extratos, classificacao, fluxo, DRE e dividas.</span></a>
+          <a class="hub-card" href="/?tab=cadastros"><strong>Cadastros</strong><span>Clientes e fornecedores centralizados para integrar vendas e compras.</span></a>
           <a class="hub-card" href="/?tab=compras"><strong>Compras</strong><span>Compras, fornecedores e custos ligados ao caixa.</span></a>
           <a class="hub-card" href="/?tab=fiscal"><strong>Fiscal</strong><span>XML, documentos fiscais e integracao contabil.</span></a>
           <a class="hub-card" href="/?tab=rh"><strong>RH</strong><span>Colaboradores, EPIs, exames, ponto e ferias.</span></a>
@@ -333,6 +338,108 @@
               <tr><td>Peso sobre receitas</td><td>{% if dashboard.receitas > 0 %}{{ "%.1f"|format((charts.monthly_installments / dashboard.receitas) * 100) }}%{% else %}0.0%{% endif %}</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="cadastros" class="tab">
+      <div class="panel hero360">
+        <h2>Cadastros Comerciais</h2>
+        <p>Base unica de clientes e fornecedores para integrar vendas, compras, financeiro, fiscal e relacionamento.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Clientes</strong><span>{{ registry_summary.customers }} cadastrados</span></div>
+          <div class="pillar"><strong>Clientes ativos</strong><span>{{ registry_summary.active_customers }}</span></div>
+          <div class="pillar"><strong>Fornecedores</strong><span>{{ registry_summary.suppliers }} cadastrados</span></div>
+          <div class="pillar"><strong>Fornecedores ativos</strong><span>{{ registry_summary.active_suppliers }}</span></div>
+          <div class="pillar"><strong>Uso</strong><span>Base para compras, vendas e fiscal.</span></div>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Novo cliente</h2>
+          <form action="/customers" method="post">
+            <input name="name" placeholder="Nome/Razao social" required>
+            <input name="document" placeholder="CPF/CNPJ">
+            <input name="phone" placeholder="Telefone">
+            <input name="email" type="email" placeholder="E-mail">
+            <input name="city" placeholder="Cidade">
+            <input name="state" placeholder="UF">
+            <input name="segment" placeholder="Segmento">
+            <select name="status">
+              <option value="Ativo">Ativo</option>
+              <option value="Prospect">Prospect</option>
+              <option value="Inativo">Inativo</option>
+            </select>
+            <input name="notes" placeholder="Observacoes">
+            <button type="submit">Salvar cliente</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Novo fornecedor</h2>
+          <form action="/suppliers" method="post">
+            <input name="name" placeholder="Nome/Razao social" required>
+            <input name="document" placeholder="CPF/CNPJ">
+            <input name="phone" placeholder="Telefone">
+            <input name="email" type="email" placeholder="E-mail">
+            <input name="city" placeholder="Cidade">
+            <input name="state" placeholder="UF">
+            <input name="category" placeholder="Categoria">
+            <input name="payment_terms" placeholder="Condicao de pagamento">
+            <select name="status">
+              <option value="Ativo">Ativo</option>
+              <option value="Bloqueado">Bloqueado</option>
+              <option value="Inativo">Inativo</option>
+            </select>
+            <input name="notes" placeholder="Observacoes">
+            <button type="submit">Salvar fornecedor</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h2>Clientes cadastrados</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Nome</th><th>Documento</th><th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Segmento</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for customer in customers %}
+                <tr>
+                  <td>{{ customer.name }}</td>
+                  <td>{{ customer.document }}</td>
+                  <td>{{ customer.phone }}</td>
+                  <td>{{ customer.email }}</td>
+                  <td>{{ customer.city }}{% if customer.state %}/{{ customer.state }}{% endif %}</td>
+                  <td>{{ customer.segment }}</td>
+                  <td class="{{ 'positive' if customer.status == 'Ativo' else 'muted' }}">{{ customer.status }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Fornecedores cadastrados</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Nome</th><th>Documento</th><th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Categoria</th><th>Pagamento</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for supplier in suppliers %}
+                <tr>
+                  <td>{{ supplier.name }}</td>
+                  <td>{{ supplier.document }}</td>
+                  <td>{{ supplier.phone }}</td>
+                  <td>{{ supplier.email }}</td>
+                  <td>{{ supplier.city }}{% if supplier.state %}/{{ supplier.state }}{% endif %}</td>
+                  <td>{{ supplier.category }}</td>
+                  <td>{{ supplier.payment_terms }}</td>
+                  <td class="{{ 'positive' if supplier.status == 'Ativo' else 'muted' }}">{{ supplier.status }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -613,6 +720,21 @@
       <div class="grid">
         <div class="kpi"><span>Total compras</span><strong>{{ purchases.total|brl }}</strong></div>
         <div class="kpi"><span>Lancamentos</span><strong>{{ purchases.count }}</strong></div>
+        <div class="kpi"><span>Fornecedores</span><strong>{{ registry_summary.suppliers }}</strong></div>
+        <div class="kpi"><span>Fornecedores ativos</span><strong>{{ registry_summary.active_suppliers }}</strong></div>
+      </div>
+      <div class="panel">
+        <h2>Cadastro rapido de fornecedor</h2>
+        <form action="/suppliers" method="post">
+          <input name="name" placeholder="Fornecedor" required>
+          <input name="document" placeholder="CPF/CNPJ">
+          <input name="phone" placeholder="Telefone">
+          <input name="email" type="email" placeholder="E-mail">
+          <input name="category" placeholder="Categoria">
+          <input name="payment_terms" placeholder="Condicao de pagamento">
+          <button type="submit">Salvar fornecedor</button>
+          <a class="pill" href="/?tab=cadastros">Ver todos os cadastros</a>
+        </form>
       </div>
       <div class="panel">
         <h2>Compras classificadas</h2>
@@ -1100,6 +1222,13 @@
       <div class="panel hero360">
         <h2>Vendas</h2>
         <p>Modulo comercial para produtos, clientes, pedidos, margem e relacionamento.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Clientes</strong><span>{{ registry_summary.customers }} cadastrados</span></div>
+          <div class="pillar"><strong>Clientes ativos</strong><span>{{ registry_summary.active_customers }}</span></div>
+          <div class="pillar"><strong>Receitas</strong><span>{{ dashboard.receitas|brl }}</span></div>
+          <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
+          <a class="pillar" href="/?tab=cadastros"><strong>Cadastros</strong><span>Ver base completa.</span></a>
+        </div>
       </div>
       <div class="two">
         <div class="panel">
@@ -1114,13 +1243,34 @@
         </div>
         <div class="panel">
           <h2>Cadastro de cliente</h2>
-          <form action="/" method="get">
-            <input type="hidden" name="tab" value="vendas">
-            <input name="customer" placeholder="Cliente">
+          <form action="/customers" method="post">
+            <input name="name" placeholder="Cliente" required>
             <input name="document" placeholder="CPF/CNPJ">
             <input name="phone" placeholder="Telefone">
-            <button type="submit">Preparar cadastro</button>
+            <input name="email" type="email" placeholder="E-mail">
+            <input name="segment" placeholder="Segmento">
+            <button type="submit">Salvar cliente</button>
           </form>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Clientes recentes</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Cliente</th><th>Documento</th><th>Telefone</th><th>E-mail</th><th>Segmento</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for customer in customers[:20] %}
+              <tr>
+                <td>{{ customer.name }}</td>
+                <td>{{ customer.document }}</td>
+                <td>{{ customer.phone }}</td>
+                <td>{{ customer.email }}</td>
+                <td>{{ customer.segment }}</td>
+                <td>{{ customer.status }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -1281,6 +1431,7 @@
         <h2>Modulos principais</h2>
         <div class="module-grid">
           <a class="module-card" href="/?tab=financeiro"><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></a>
+          <a class="module-card" href="/?tab=cadastros"><strong>Cadastros Base</strong><span>Clientes, fornecedores, contatos, documentos e relacionamento.</span></a>
           <a class="module-card" href="/?tab=rh"><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></a>
           <a class="module-card" href="/?tab=producao"><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></a>
           <a class="module-card" href="/?tab=compras"><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></a>

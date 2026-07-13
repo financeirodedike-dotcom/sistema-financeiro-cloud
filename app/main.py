@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, CashflowPlan, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Supplier, Transaction, User
 from app.ofx_parser import parse_ofx
 from app.reports import balance_sheet, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -342,6 +342,8 @@ def home(request: Request, db: Session = Depends(get_db)):
     user_memberships = db.scalars(
         select(Membership).where(Membership.company_id == company.id).order_by(Membership.created_at.desc())
     ).all()
+    customers = db.scalars(select(Customer).where(Customer.company_id == company.id).order_by(Customer.created_at.desc())).all()
+    suppliers = db.scalars(select(Supplier).where(Supplier.company_id == company.id).order_by(Supplier.created_at.desc())).all()
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     current_user_membership = current_membership(user, company, db)
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
@@ -403,6 +405,14 @@ def home(request: Request, db: Session = Depends(get_db)):
             "pending_count": pending_count,
             "imports": imports,
             "user_memberships": user_memberships,
+            "customers": customers,
+            "suppliers": suppliers,
+            "registry_summary": {
+                "customers": len(customers),
+                "active_customers": sum(1 for row in customers if row.status == "Ativo"),
+                "suppliers": len(suppliers),
+                "active_suppliers": sum(1 for row in suppliers if row.status == "Ativo"),
+            },
             "access_summary": {
                 "total": len(user_memberships),
                 "active": active_users,
@@ -669,6 +679,88 @@ def create_rule(request: Request, keyword: str = Form(...), account_id: int = Fo
         except IntegrityError:
             db.rollback()
     return RedirectResponse("/?tab=classificacao", status_code=303)
+
+
+@app.post("/customers")
+def create_customer(
+    request: Request,
+    name: str = Form(...),
+    document: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    city: str = Form(""),
+    state: str = Form(""),
+    segment: str = Form(""),
+    status: str = Form("Ativo"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    clean_document = document.strip()
+    customer = None
+    if clean_document:
+        customer = db.scalar(
+            select(Customer).where(Customer.company_id == company.id, Customer.document == clean_document)
+        )
+    if not customer:
+        customer = Customer(company_id=company.id, name=name.strip())
+        db.add(customer)
+    customer.name = name.strip()
+    customer.document = clean_document
+    customer.phone = phone.strip()
+    customer.email = email.strip().lower()
+    customer.city = city.strip()
+    customer.state = state.strip().upper()
+    customer.segment = segment.strip()
+    customer.status = status if status in {"Ativo", "Inativo", "Prospect"} else "Ativo"
+    customer.notes = notes.strip()
+    db.commit()
+    return RedirectResponse("/?tab=cadastros", status_code=303)
+
+
+@app.post("/suppliers")
+def create_supplier(
+    request: Request,
+    name: str = Form(...),
+    document: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    city: str = Form(""),
+    state: str = Form(""),
+    category: str = Form(""),
+    payment_terms: str = Form(""),
+    status: str = Form("Ativo"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    clean_document = document.strip()
+    supplier = None
+    if clean_document:
+        supplier = db.scalar(
+            select(Supplier).where(Supplier.company_id == company.id, Supplier.document == clean_document)
+        )
+    if not supplier:
+        supplier = Supplier(company_id=company.id, name=name.strip())
+        db.add(supplier)
+    supplier.name = name.strip()
+    supplier.document = clean_document
+    supplier.phone = phone.strip()
+    supplier.email = email.strip().lower()
+    supplier.city = city.strip()
+    supplier.state = state.strip().upper()
+    supplier.category = category.strip()
+    supplier.payment_terms = payment_terms.strip()
+    supplier.status = status if status in {"Ativo", "Inativo", "Bloqueado"} else "Ativo"
+    supplier.notes = notes.strip()
+    db.commit()
+    return RedirectResponse("/?tab=cadastros", status_code=303)
 
 
 @app.post("/debts")

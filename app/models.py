@@ -140,6 +140,45 @@ class CashflowPlan(Base):
     company: Mapped[Company] = relationship()
 
 
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    document: Mapped[str] = mapped_column(String(40), default="")
+    phone: Mapped[str] = mapped_column(String(60), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    city: Mapped[str] = mapped_column(String(120), default="")
+    state: Mapped[str] = mapped_column(String(40), default="")
+    segment: Mapped[str] = mapped_column(String(100), default="")
+    status: Mapped[str] = mapped_column(String(40), default="Ativo")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
+class Supplier(Base):
+    __tablename__ = "suppliers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    document: Mapped[str] = mapped_column(String(40), default="")
+    phone: Mapped[str] = mapped_column(String(60), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    city: Mapped[str] = mapped_column(String(120), default="")
+    state: Mapped[str] = mapped_column(String(40), default="")
+    category: Mapped[str] = mapped_column(String(100), default="")
+    payment_terms: Mapped[str] = mapped_column(String(120), default="")
+    status: Mapped[str] = mapped_column(String(40), default="Ativo")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class Debt(Base):
     __tablename__ = "debts"
 
