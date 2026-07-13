@@ -96,6 +96,8 @@
     .hero360 .pillar, .hero360 .module-card { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
     .module-card strong, .pillar strong { display: block; color: #12355b; margin-bottom: 6px; }
     .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
+    .hero360 a.pillar { display: block; color: white; text-decoration: none; transition: transform .15s ease, background .15s ease; }
+    .hero360 a.pillar:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
     .finance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
     .finance-tab { display: inline-flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 8px; background: #eef4f8; color: #12355b; border: 1px solid #cbd6e2; text-decoration: none; font-weight: 800; }
     .finance-tab:hover { background: #12355b; color: white; }
@@ -140,9 +142,14 @@
     .calendar-day strong { display: block; color: #12355b; margin-bottom: 6px; }
     .calendar-day span { display: block; color: #667085; font-size: 12px; line-height: 1.35; }
     .calendar-day.highlight { border-color: #0f766e; background: #f0fdfa; }
+    .module-hub { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .hub-card { display: block; padding: 14px; background: #fff; border: 1px solid #d8dee9; border-radius: 10px; text-decoration: none; color: #172033; box-shadow: 0 8px 22px rgba(18,53,91,.05); }
+    .hub-card strong { display: block; color: #12355b; margin-bottom: 6px; }
+    .hub-card span { color: #667085; font-size: 13px; line-height: 1.35; }
+    .hub-card:hover { border-color: #0f766e; transform: translateY(-1px); }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
-      .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid { grid-template-columns: 1fr; }
+      .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid, .module-hub { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -201,11 +208,11 @@
         <h2>Centro de Controle Business360 AI</h2>
         <p>ERP, BI e inteligencia gerencial em uma visao unica para acompanhar caixa, resultado, endividamento, compras e classificacoes pendentes.</p>
         <div class="pillar-grid">
-          <div class="pillar"><strong>Financeiro</strong><span>Fluxo, DRE, balanco, OFX e contas.</span></div>
-          <div class="pillar"><strong>Operacao</strong><span>Compras, producao, estoque e entregas.</span></div>
-          <div class="pillar"><strong>Comercial</strong><span>CRM, pedidos, margem e clientes.</span></div>
-          <div class="pillar"><strong>Pessoas</strong><span>RH, produtividade e rotinas internas.</span></div>
-          <div class="pillar"><strong>IA Consultiva</strong><span>Alertas, recomendacoes e plano de acao.</span></div>
+          <a class="pillar" href="/?tab=financeiro"><strong>Financeiro</strong><span>Fluxo, DRE, balanco, OFX e contas.</span></a>
+          <a class="pillar" href="/?tab=producao"><strong>Operacao</strong><span>Compras, producao, estoque e entregas.</span></a>
+          <a class="pillar" href="/?tab=vendas"><strong>Comercial</strong><span>CRM, pedidos, margem e clientes.</span></a>
+          <a class="pillar" href="/?tab=rh"><strong>Pessoas</strong><span>RH, produtividade e rotinas internas.</span></a>
+          <a class="pillar" href="/?tab=mapa"><strong>Mapa 360</strong><span>Alertas, recomendacoes e plano de acao.</span></a>
         </div>
       </div>
       <div class="grid">
@@ -218,6 +225,54 @@
         <h2>Leitura rapida do caixa</h2>
         <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
         <p class="muted">{{ cashflow_explanation }} Para investigar, entre em Financeiro > Fluxo de Caixa e compare os meses com maior saida.</p>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Onde esta a diferenca de caixa?</h2>
+          <table>
+            <thead><tr><th>Mes</th><th>Entradas</th><th>Saidas</th><th>Saldo</th></tr></thead>
+            <tbody>
+              {% for row in cashflow_diagnostics.worst_months %}
+              <tr>
+                <td>{{ row.month }}</td>
+                <td>{{ row.entradas|brl }}</td>
+                <td>{{ row.saidas|brl }}</td>
+                <td class="{{ 'negative' if row.saldo < 0 else 'positive' }}">{{ row.saldo|brl }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="muted">Esses sao os meses que mais puxaram o saldo para baixo.</p>
+        </div>
+        <div class="panel">
+          <h2>Maiores grupos de saida</h2>
+          <table>
+            <thead><tr><th>Grupo</th><th>Valor</th></tr></thead>
+            <tbody>
+              {% for row in cashflow_diagnostics.expense_groups %}
+              <tr><td>{{ row.group }}</td><td>{{ row.value|brl }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if cashflow_diagnostics.unclassified_outflows > 0 %}
+          <p class="muted">Ha {{ cashflow_diagnostics.unclassified_outflows|brl }} em saidas ainda a classificar. Isso pode distorcer a leitura por grupo.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Centro de Controle Integrado</h2>
+        <div class="module-hub">
+          <a class="hub-card" href="/?tab=financeiro"><strong>Financeiro</strong><span>Resumo, extratos, classificacao, fluxo, DRE e dividas.</span></a>
+          <a class="hub-card" href="/?tab=compras"><strong>Compras</strong><span>Compras, fornecedores e custos ligados ao caixa.</span></a>
+          <a class="hub-card" href="/?tab=fiscal"><strong>Fiscal</strong><span>XML, documentos fiscais e integracao contabil.</span></a>
+          <a class="hub-card" href="/?tab=rh"><strong>RH</strong><span>Colaboradores, EPIs, exames, ponto e ferias.</span></a>
+          <a class="hub-card" href="/?tab=vendas"><strong>Vendas</strong><span>Clientes, produtos e leitura comercial.</span></a>
+          <a class="hub-card" href="/?tab=marketing"><strong>Marketing</strong><span>Calendario, ROI e CAC.</span></a>
+          <a class="hub-card" href="/?tab=producao"><strong>Producao</strong><span>PCP, etapas, qualidade e entregas.</span></a>
+          <a class="hub-card" href="/?tab=balanco"><strong>Balanco</strong><span>Patrimonio, caixa, passivos e capital gerencial.</span></a>
+          <a class="hub-card" href="/?tab=mapa"><strong>Mapa 360</strong><span>Arquitetura da empresa e calendario executivo.</span></a>
+          <a class="hub-card" href="/?tab=acessos"><strong>Acessos</strong><span>Usuarios, perfis, status e redefinicao de senha.</span></a>
+        </div>
       </div>
       <div class="two">
         <div class="panel">
@@ -1225,14 +1280,14 @@
       <div class="panel">
         <h2>Modulos principais</h2>
         <div class="module-grid">
-          <div class="module-card"><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></div>
-          <div class="module-card"><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></div>
-          <div class="module-card"><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></div>
-          <div class="module-card"><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></div>
-          <div class="module-card"><strong>Comercial/CRM</strong><span>Clientes, funil, propostas, vendas e margem.</span></div>
-          <div class="module-card"><strong>Fiscal</strong><span>NF-e, NFS-e, impostos, documentos e integracao contabil.</span></div>
-          <div class="module-card"><strong>Inteligencia</strong><span>Alertas criticos, recomendacoes e leitura dos dados.</span></div>
-          <div class="module-card"><strong>Plataforma</strong><span>Usuarios, permissoes, auditoria, seguranca e API.</span></div>
+          <a class="module-card" href="/?tab=financeiro"><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></a>
+          <a class="module-card" href="/?tab=rh"><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></a>
+          <a class="module-card" href="/?tab=producao"><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></a>
+          <a class="module-card" href="/?tab=compras"><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></a>
+          <a class="module-card" href="/?tab=vendas"><strong>Comercial/CRM</strong><span>Clientes, funil, propostas, vendas e margem.</span></a>
+          <a class="module-card" href="/?tab=fiscal"><strong>Fiscal</strong><span>NF-e, NFS-e, impostos, documentos e integracao contabil.</span></a>
+          <a class="module-card" href="/?tab=dashboard"><strong>Inteligencia</strong><span>Alertas criticos, recomendacoes e leitura dos dados.</span></a>
+          <a class="module-card" href="/?tab=acessos"><strong>Plataforma</strong><span>Usuarios, permissoes, auditoria, seguranca e API.</span></a>
         </div>
       </div>
 

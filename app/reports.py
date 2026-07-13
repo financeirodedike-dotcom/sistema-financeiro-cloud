@@ -48,6 +48,38 @@ def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
     return output
 
 
+def cashflow_diagnostics(db: Session, company_id: int) -> dict:
+    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    by_month = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
+    by_group = defaultdict(float)
+    unclassified_outflows = 0
+    for row in rows:
+        month = row.date.strftime("%Y-%m")
+        movement = row.entrada - row.saida
+        by_month[month]["entradas"] += row.entrada
+        by_month[month]["saidas"] += row.saida
+        by_month[month]["saldo"] += movement
+        if row.saida > 0:
+            group = row.account.group_name if row.account else "A CLASSIFICAR"
+            by_group[group] += row.saida
+            if group == "A CLASSIFICAR":
+                unclassified_outflows += row.saida
+
+    month_rows = [
+        {"month": month, **values}
+        for month, values in sorted(by_month.items(), key=lambda item: item[1]["saldo"])
+    ]
+    group_rows = [
+        {"group": group, "value": value}
+        for group, value in sorted(by_group.items(), key=lambda item: item[1], reverse=True)
+    ]
+    return {
+        "worst_months": month_rows[:5],
+        "expense_groups": group_rows[:6],
+        "unclassified_outflows": unclassified_outflows,
+    }
+
+
 def planned_cashflow(db: Session, company_id: int) -> dict:
     actual_rows = monthly_cashflow(db, company_id)
     actual_by_month = {row["month"]: row for row in actual_rows}

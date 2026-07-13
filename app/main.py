@@ -16,7 +16,7 @@ from app.classifier import classify_account
 from app.database import get_db, init_db
 from app.models import Anticipation, AnticipationAttachment, CashflowPlan, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
-from app.reports import balance_sheet, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
+from app.reports import balance_sheet, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
 app = FastAPI(title="Business360 AI")
@@ -435,6 +435,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "dashboard": dashboard(db, company.id),
             "cashflow": cashflow_report,
             "cashflow_totals": cashflow_totals,
+            "cashflow_diagnostics": cashflow_diagnostics(db, company.id),
             "cashflow_explanation": cashflow_explanation,
             "planned_cashflow": planned_cashflow(db, company.id),
             "dre": dre(db, company.id),
