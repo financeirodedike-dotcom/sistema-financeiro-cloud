@@ -49,11 +49,8 @@
       gap: 16px;
       align-items: center;
       box-shadow: 0 14px 34px rgba(6,21,34,.20);
-      margin-left: 116px;
       min-height: 82px;
-      transition: margin-left .22s ease;
     }
-    body:has(.tabs:hover) header { margin-left: 292px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark {
       width: 50px;
@@ -74,100 +71,37 @@
       display: grid;
       gap: 16px;
       max-width: 1920px;
-      margin: 0 auto 0 116px;
-      transition: margin-left .22s ease;
+      margin: 0 auto;
     }
-    body:has(.tabs:hover) main { margin-left: 292px; }
     .tabs {
-      position: fixed;
-      top: 18px;
-      left: 18px;
-      bottom: 18px;
-      z-index: 20;
+      position: sticky;
+      top: 0;
+      z-index: 5;
       display: flex;
-      flex-direction: column;
       gap: 8px;
-      overflow-y: auto;
-      width: 78px;
-      background: linear-gradient(180deg, #2147ff, #1430c8);
+      overflow-x: auto;
+      background: rgba(246, 250, 253, .94);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,.22);
-      border-radius: 22px;
-      padding: 18px 12px;
-      box-shadow: 0 22px 48px rgba(20,48,200,.24);
-      transition: width .22s ease, box-shadow .22s ease;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 14px;
+      box-shadow: 0 8px 18px rgba(15,35,55,.04);
     }
-    .tabs:hover {
-      width: 256px;
-      box-shadow: 0 26px 56px rgba(20,48,200,.30);
-    }
-    .tabs::before {
-      content: "360";
-      display: grid;
-      place-items: center;
-      width: 48px;
-      height: 48px;
-      margin: 0 auto 8px;
-      border-radius: 16px;
-      background: rgba(255,255,255,.12);
-      color: white;
-      font-size: 16px;
-      font-weight: 900;
-      border: 1px solid rgba(255,255,255,.26);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
-      transition: width .22s ease, height .22s ease, border-radius .22s ease, font-size .22s ease;
-    }
-    .tabs:hover::before {
-      content: "Business360 AI";
-      width: 172px;
-      height: 58px;
-      border-radius: 18px;
-      font-size: 15px;
-    }
-    .tabs::after {
-      content: "Menu principal";
-      order: -1;
-      display: block;
-      color: rgba(255,255,255,.72);
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      padding: 0 10px 2px;
-      opacity: 0;
-      white-space: nowrap;
-      transition: opacity .18s ease;
-    }
-    .tabs:hover::after { opacity: 1; }
     .tabs label {
       display: flex;
       align-items: center;
-      justify-content: center;
-      min-height: 42px;
-      padding: 10px 8px;
-      border-radius: 12px;
-      color: rgba(255,255,255,.88);
+      padding: 10px 13px;
+      border-radius: var(--radius-sm);
+      color: var(--blue);
       font-weight: 800;
       cursor: pointer;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: clip;
-      font-size: 0;
-      border: 1px solid rgba(255,255,255,.08);
-      transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+      border: 1px solid transparent;
+      transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
     }
-    .tabs label::first-letter { font-size: 15px; }
-    .tabs:hover label {
-      justify-content: flex-start;
-      padding: 10px 12px;
-      font-size: 14px;
-    }
-    .tabs:hover label::first-letter { font-size: inherit; }
     .tabs label:hover {
-      background: rgba(255,255,255,.13);
-      border-color: rgba(255,255,255,.24);
-      color: white;
-      transform: translateX(2px);
+      background: #e8f1f8;
+      border-color: #d2e1ee;
+      transform: translateY(-1px);
     }
     input[name="tab"] { display: none; }
     .tab { display: none; }
@@ -193,10 +127,10 @@
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
     #tab-antecipacoes:checked ~ .tabs label[for="tab-antecipacoes"],
     #tab-acessos:checked ~ .tabs label[for="tab-acessos"] {
-      background: white;
-      color: #1430c8;
-      box-shadow: 0 12px 24px rgba(6,21,34,.18);
-      border-color: white;
+      background: var(--blue);
+      color: white;
+      box-shadow: 0 10px 22px rgba(18,53,91,.16);
+      border-color: var(--blue);
     }
     #tab-dashboard:checked ~ main #dashboard,
     #tab-financeiro:checked ~ main #financeiro,
@@ -366,52 +300,8 @@
     section.tab { animation: fadeIn .16s ease; }
     @keyframes fadeIn { from { opacity: .78; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
     @media (max-width: 900px) {
-      header { align-items: flex-start; flex-direction: column; margin-left: 0; }
-      main { margin-left: 0; padding: 14px; }
-      .tabs {
-        position: sticky;
-        top: 0;
-        left: auto;
-        bottom: auto;
-        width: auto;
-        flex-direction: row;
-        overflow-x: auto;
-        border-radius: 0;
-        padding: 10px 14px;
-        background: rgba(246, 250, 253, .96);
-        border: 0;
-        border-bottom: 1px solid var(--line);
-        box-shadow: 0 8px 18px rgba(15,35,55,.04);
-      }
-      .tabs::before, .tabs::after { display: none; }
-      .tabs label { color: var(--blue); border-color: transparent; min-height: auto; }
-      .tabs label:hover { background: #e8f1f8; border-color: #d2e1ee; color: var(--blue); transform: translateY(-1px); }
-      #tab-dashboard:checked ~ .tabs label[for="tab-dashboard"],
-      #tab-financeiro:checked ~ .tabs label[for="tab-financeiro"],
-      #tab-cadastros:checked ~ .tabs label[for="tab-cadastros"],
-      #tab-extratos:checked ~ .tabs label[for="tab-extratos"],
-      #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
-      #tab-compras:checked ~ .tabs label[for="tab-compras"],
-      #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
-      #tab-caixa-planejado:checked ~ .tabs label[for="tab-caixa-planejado"],
-      #tab-conciliacao:checked ~ .tabs label[for="tab-conciliacao"],
-      #tab-dre:checked ~ .tabs label[for="tab-dre"],
-      #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
-      #tab-endividamento:checked ~ .tabs label[for="tab-endividamento"],
-      #tab-contas-pagar:checked ~ .tabs label[for="tab-contas-pagar"],
-      #tab-contas-receber:checked ~ .tabs label[for="tab-contas-receber"],
-      #tab-fiscal:checked ~ .tabs label[for="tab-fiscal"],
-      #tab-rh:checked ~ .tabs label[for="tab-rh"],
-      #tab-vendas:checked ~ .tabs label[for="tab-vendas"],
-      #tab-marketing:checked ~ .tabs label[for="tab-marketing"],
-      #tab-producao:checked ~ .tabs label[for="tab-producao"],
-      #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
-      #tab-antecipacoes:checked ~ .tabs label[for="tab-antecipacoes"],
-      #tab-acessos:checked ~ .tabs label[for="tab-acessos"] { background: var(--blue); color: white; box-shadow: 0 8px 20px rgba(18,53,91,.18); border-color: var(--blue); }
-      .tabs:hover { width: auto; box-shadow: 0 8px 18px rgba(15,35,55,.04); }
-      .tabs label { font-size: 14px; justify-content: flex-start; padding: 10px 13px; overflow: visible; }
-      .tabs label::first-letter { font-size: inherit; }
-      body:has(.tabs:hover) header, body:has(.tabs:hover) main { margin-left: 0; }
+      header { align-items: flex-start; flex-direction: column; }
+      main { padding: 14px; }
       .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid, .module-hub { grid-template-columns: 1fr; }
     }
   </style>
