@@ -133,9 +133,16 @@
     .role-badge { display: inline-block; border-radius: 999px; padding: 5px 9px; background: #e8f3ff; color: #12355b; font-weight: 700; font-size: 12px; }
     .danger { background: #c1121f; }
     .inline-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #667085; }
+    .file-list { display: grid; gap: 6px; margin-top: 8px; }
+    .file-link { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f766e; font-weight: 700; text-decoration: none; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(90px, 1fr)); gap: 8px; }
+    .calendar-day { min-height: 76px; border: 1px solid #d8dee9; border-radius: 8px; background: #fff; padding: 8px; }
+    .calendar-day strong { display: block; color: #12355b; margin-bottom: 6px; }
+    .calendar-day span { display: block; color: #667085; font-size: 12px; line-height: 1.35; }
+    .calendar-day.highlight { border-color: #0f766e; background: #f0fdfa; }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
-      .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid { grid-template-columns: 1fr; }
+      .grid, .two, .three, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -688,7 +695,7 @@
       <div class="panel">
         <h2>Historico de antecipacoes</h2>
         <table>
-          <thead><tr><th>Data</th><th>Empresa/Pessoa</th><th>Tipo</th><th>Titulos</th><th>Taxa titulos</th><th>Juros</th><th>IOF</th><th>Custas</th><th>Custo total</th><th>Liquido</th></tr></thead>
+          <thead><tr><th>Data</th><th>Empresa/Pessoa</th><th>Tipo</th><th>Titulos</th><th>Taxa titulos</th><th>Juros</th><th>IOF</th><th>Custas</th><th>Custo total</th><th>Liquido</th><th>Anexos</th></tr></thead>
           <tbody>
             {% for row in anticipations %}
             {% set total_cost = (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value %}
@@ -703,6 +710,18 @@
               <td>{{ row.costs_value|brl }}</td>
               <td class="negative">{{ total_cost|brl }}</td>
               <td class="{{ 'negative' if (row.title_value - total_cost) < 0 else 'positive' }}">{{ (row.title_value - total_cost)|brl }}</td>
+              <td>
+                <form action="/anticipations/{{ row.id }}/attachments" method="post" enctype="multipart/form-data">
+                  <input name="file" type="file" required>
+                  <input name="notes" placeholder="Observacao do arquivo">
+                  <button type="submit">Salvar arquivo</button>
+                </form>
+                <div class="file-list">
+                  {% for attachment in anticipation_attachments.get(row.id, []) %}
+                  <a class="file-link" href="/anticipations/attachments/{{ attachment.id }}" title="{{ attachment.original_filename }}">{{ attachment.original_filename }}</a>
+                  {% endfor %}
+                </div>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1175,6 +1194,7 @@
                       <input name="is_active" type="checkbox" {% if membership.user.is_active %}checked{% endif %} {% if membership.user_id == user.id %}disabled{% endif %}>
                       Ativo
                     </label>
+                    <input name="new_password" type="password" placeholder="Redefinir senha" minlength="6">
                     <button type="submit">Salvar</button>
                   </form>
                   {% else %}
@@ -1272,6 +1292,20 @@
           <span class="pill">E-commerce</span>
           <span class="pill">E-mail</span>
           <span class="pill">APIs externas</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Calendario executivo 360</h2>
+        <p class="muted">Agenda visual para acompanhar as rotinas de gestao que sustentam o Business360 AI.</p>
+        <div class="calendar-grid">
+          <div class="calendar-day highlight"><strong>Segunda</strong><span>Revisao do caixa, contas a pagar e pendencias de classificacao.</span></div>
+          <div class="calendar-day"><strong>Terca</strong><span>Compras, fornecedores, estoque e necessidades da producao.</span></div>
+          <div class="calendar-day"><strong>Quarta</strong><span>Vendas, clientes, propostas, CRM e oportunidades comerciais.</span></div>
+          <div class="calendar-day"><strong>Quinta</strong><span>RH, ponto, ferias, exames, EPIs e treinamentos.</span></div>
+          <div class="calendar-day"><strong>Sexta</strong><span>DRE gerencial, fluxo de caixa, endividamento e plano de acao.</span></div>
+          <div class="calendar-day"><strong>Sabado</strong><span>Indicadores semanais, melhorias e organizacao documental.</span></div>
+          <div class="calendar-day"><strong>Domingo</strong><span>Planejamento leve da semana e prioridades da diretoria.</span></div>
         </div>
       </div>
 

@@ -13,7 +13,7 @@
     input, button { padding: 11px 12px; border: 1px solid #d8dee9; border-radius: 6px; font-size: 15px; }
     button { background: #0f766e; color: white; font-weight: 700; cursor: pointer; }
     a { color: #0f766e; font-weight: 700; text-decoration: none; }
-    .foot { margin-top: 14px; font-size: 14px; }
+    .foot { margin-top: 14px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -25,7 +25,10 @@
       <input type="password" name="password" placeholder="Senha" required>
       <button type="submit">Entrar</button>
     </form>
-    <div class="foot">Primeiro acesso? <a href="/register">Criar conta</a></div>
+    <div class="foot">
+      <span>Primeiro acesso? <a href="/register">Criar conta</a></span>
+      <a href="/forgot-password">Esqueci minha senha</a>
+    </div>
   </section>
 </body>
 </html>

@@ -1,10 +1,11 @@
 import hashlib
+import re
 import unicodedata
 from datetime import date, datetime
 from xml.etree import ElementTree
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, CashflowPlan, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, CashflowPlan, ClassificationRule, Company, Debt, FinancialAccount, ImportBatch, Membership, Transaction, User
 from app.ofx_parser import parse_ofx
 from app.reports import balance_sheet, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -152,6 +153,11 @@ def account_dedupe_key(name: str) -> str:
     return "".join(char for char in normalized if not unicodedata.combining(char))
 
 
+def safe_upload_filename(filename: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", filename.strip())
+    return cleaned[:160] or "arquivo"
+
+
 def seed_company_accounts(db: Session, company: Company) -> None:
     existing_accounts = db.scalars(
         select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.id)
@@ -243,6 +249,11 @@ def login(email: str = Form(...), password: str = Form(...), db: Session = Depen
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(SESSION_COOKIE, create_session_token(user.id), httponly=True, samesite="lax")
     return response
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request=request, name="forgot_password.html", context={})
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -337,6 +348,14 @@ def home(request: Request, db: Session = Depends(get_db)):
     anticipations = db.scalars(
         select(Anticipation).where(Anticipation.company_id == company.id).order_by(Anticipation.created_at.desc())
     ).all()
+    anticipation_attachment_rows = db.scalars(
+        select(AnticipationAttachment)
+        .where(AnticipationAttachment.company_id == company.id)
+        .order_by(AnticipationAttachment.created_at.desc())
+    ).all()
+    anticipation_attachments: dict[int, list[AnticipationAttachment]] = {}
+    for attachment in anticipation_attachment_rows:
+        anticipation_attachments.setdefault(attachment.anticipation_id, []).append(attachment)
     anticipation_total_titles = sum(row.title_value for row in anticipations)
     anticipation_total_cost = sum(
         (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value
@@ -394,6 +413,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
             "anticipations": anticipations,
+            "anticipation_attachments": anticipation_attachments,
             "anticipation_summary": {
                 "title_total": anticipation_total_titles,
                 "cost_total": anticipation_total_cost,
@@ -608,6 +628,7 @@ def update_access_user(
     membership_id: int,
     name: str = Form(...),
     role: str = Form("consulta"),
+    new_password: str = Form(""),
     is_active: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -622,6 +643,9 @@ def update_access_user(
     if membership:
         membership.user.name = name.strip() or membership.user.name
         membership.role = role if role in allowed_roles else membership.role
+        if new_password.strip():
+            membership.user.password_hash = hash_password(new_password.strip())
+            membership.user.is_active = True
         if membership.user_id != user.id:
             membership.user.is_active = is_active == "on"
         db.commit()
@@ -820,6 +844,63 @@ def create_anticipation(
     )
     db.commit()
     return RedirectResponse("/?tab=antecipacoes", status_code=303)
+
+
+@app.post("/anticipations/{anticipation_id}/attachments")
+async def upload_anticipation_attachment(
+    request: Request,
+    anticipation_id: int,
+    file: UploadFile = File(...),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    anticipation = db.scalar(
+        select(Anticipation).where(Anticipation.company_id == company.id, Anticipation.id == anticipation_id)
+    )
+    if not anticipation or not file.filename:
+        return RedirectResponse("/?tab=antecipacoes", status_code=303)
+
+    content = await file.read()
+    if not content:
+        return RedirectResponse("/?tab=antecipacoes", status_code=303)
+
+    original_filename = safe_upload_filename(file.filename)
+    stored_filename = f"{anticipation.id}_{int(datetime.utcnow().timestamp())}_{original_filename}"
+    db.add(
+        AnticipationAttachment(
+            company_id=company.id,
+            anticipation_id=anticipation.id,
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            content_type=file.content_type or "",
+            file_data=content,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse("/?tab=antecipacoes", status_code=303)
+
+
+@app.get("/anticipations/attachments/{attachment_id}")
+def download_anticipation_attachment(request: Request, attachment_id: int, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    attachment = db.scalar(
+        select(AnticipationAttachment).where(
+            AnticipationAttachment.company_id == company.id,
+            AnticipationAttachment.id == attachment_id,
+        )
+    )
+    if not attachment:
+        return RedirectResponse("/?tab=antecipacoes", status_code=303)
+    headers = {"Content-Disposition": f'attachment; filename="{attachment.original_filename}"'}
+    return Response(content=attachment.file_data, media_type=attachment.content_type or "application/octet-stream", headers=headers)
 
 
 @app.post("/fiscal/import-xml")
