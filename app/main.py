@@ -1,7 +1,7 @@
 import hashlib
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from xml.etree import ElementTree
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, User
 from app.ofx_parser import parse_ofx, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -231,6 +231,57 @@ def receivable_overdue_days(row: Receivable) -> int:
 
 def receivable_total(row: Receivable) -> float:
     return (row.installment_value or 0) - (row.discount_value or 0) + (row.interest_value or 0)
+
+
+def anticipation_cost(title_value: float, title_fee_rate: float, interest_rate: float, iof_value: float, costs_value: float) -> float:
+    return (title_value * (title_fee_rate / 100)) + (title_value * (interest_rate / 100)) + iof_value + costs_value
+
+
+def build_control_agenda(tasks: list[CompanyTask], debts: list[Debt], receivable_rows: list[dict]) -> dict:
+    today = date.today()
+    week_end = today + timedelta(days=7)
+    pending_tasks = [task for task in tasks if task.status != "Concluida"]
+    today_tasks = [task for task in pending_tasks if task.due_date == today]
+    week_tasks = [task for task in pending_tasks if task.due_date and today <= task.due_date <= week_end]
+    payable_today = [debt for debt in debts if debt.status == "Ativo" and debt.due_date == today]
+    payable_week = [debt for debt in debts if debt.status == "Ativo" and debt.due_date and today <= debt.due_date <= week_end]
+    receivable_today = [row for row in receivable_rows if row["item"].due_date == today and not row["status"].startswith("Pago")]
+    receivable_week = [
+        row
+        for row in receivable_rows
+        if row["item"].due_date and today <= row["item"].due_date <= week_end and not row["status"].startswith("Pago")
+    ]
+    calendar_days = []
+    for offset in range(7):
+        day = today + timedelta(days=offset)
+        day_payables = [debt for debt in payable_week if debt.due_date == day]
+        day_receivables = [row for row in receivable_week if row["item"].due_date == day]
+        day_tasks = [task for task in week_tasks if task.due_date == day]
+        calendar_days.append(
+            {
+                "date": day,
+                "payables": day_payables,
+                "receivables": day_receivables,
+                "tasks": day_tasks,
+                "payable_total": sum(debt.capital_value or 0 for debt in day_payables),
+                "receivable_total": sum(row["total"] for row in day_receivables),
+            }
+        )
+    return {
+        "today": today,
+        "week_end": week_end,
+        "today_tasks": today_tasks,
+        "week_tasks": week_tasks,
+        "payable_today": payable_today,
+        "payable_week": payable_week,
+        "receivable_today": receivable_today,
+        "receivable_week": receivable_week,
+        "calendar_days": calendar_days,
+        "payable_today_total": sum(debt.capital_value or 0 for debt in payable_today),
+        "payable_week_total": sum(debt.capital_value or 0 for debt in payable_week),
+        "receivable_today_total": sum(row["total"] for row in receivable_today),
+        "receivable_week_total": sum(row["total"] for row in receivable_week),
+    }
 
 
 def normalize_account_name(name: str) -> str:
@@ -485,6 +536,13 @@ def home(request: Request, db: Session = Depends(get_db)):
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     current_user_membership = current_membership(user, company, db)
     debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+    notes = db.scalars(
+        select(CompanyNote).where(CompanyNote.company_id == company.id).order_by(CompanyNote.created_at.desc()).limit(5)
+    ).all()
+    tasks = db.scalars(
+        select(CompanyTask).where(CompanyTask.company_id == company.id).order_by(CompanyTask.due_date.asc(), CompanyTask.created_at.desc())
+    ).all()
+    control_agenda = build_control_agenda(tasks, debts, receivable_rows)
     anticipations = db.scalars(
         select(Anticipation).where(Anticipation.company_id == company.id).order_by(Anticipation.created_at.desc())
     ).all()
@@ -498,7 +556,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         anticipation_attachments.setdefault(attachment.anticipation_id, []).append(attachment)
     anticipation_total_titles = sum(row.title_value for row in anticipations)
     anticipation_total_cost = sum(
-        (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value
+        anticipation_cost(row.title_value or 0, row.title_fee_rate or 0, row.interest_rate or 0, row.iof_value or 0, row.costs_value or 0)
         for row in anticipations
     )
     debt_rows = [
@@ -564,6 +622,9 @@ def home(request: Request, db: Session = Depends(get_db)):
             "current_membership": current_user_membership,
             "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
+            "notes": notes,
+            "tasks": tasks,
+            "control_agenda": control_agenda,
             "anticipations": anticipations,
             "anticipation_attachments": anticipation_attachments,
             "anticipation_summary": {
@@ -955,7 +1016,7 @@ def create_receivable(
     request: Request,
     due_date: str = Form(""),
     customer_name: str = Form(...),
-    account_id: int | None = Form(None),
+    account_id: str = Form(""),
     description: str = Form(""),
     document_number: str = Form(""),
     installment: str = Form(""),
@@ -997,6 +1058,51 @@ def create_receivable(
     return RedirectResponse("/?tab=contas-receber", status_code=303)
 
 
+@app.post("/receivables/{receivable_id}/anticipate")
+def anticipate_receivable(
+    request: Request,
+    receivable_id: int,
+    anticipation_date: str = Form(""),
+    counterparty: str = Form(...),
+    counterparty_type: str = Form("Empresa"),
+    advanced_value: float = Form(0),
+    interest_rate: float = Form(0),
+    title_fee_rate: float = Form(0),
+    iof_value: float = Form(0),
+    costs_value: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    receivable = db.scalar(select(Receivable).where(Receivable.company_id == company.id, Receivable.id == receivable_id))
+    if receivable:
+        title_value = receivable_total(receivable)
+        estimated_cost = anticipation_cost(title_value, title_fee_rate, interest_rate, iof_value, costs_value)
+        final_advanced = advanced_value if advanced_value > 0 else max(title_value - estimated_cost, 0)
+        db.add(
+            Anticipation(
+                company_id=company.id,
+                receivable_id=receivable.id,
+                anticipation_date=parse_filter_date(anticipation_date) or date.today(),
+                counterparty=counterparty.strip(),
+                counterparty_type=counterparty_type,
+                title_value=title_value,
+                advanced_value=final_advanced,
+                title_fee_rate=title_fee_rate,
+                interest_rate=interest_rate,
+                iof_value=iof_value,
+                costs_value=costs_value,
+                notes=notes.strip() or f"Antecipacao do titulo {receivable.document_number or receivable.description}",
+            )
+        )
+        receivable.notes = " | ".join(part for part in [receivable.notes, f"Antecipado com {counterparty.strip()}"] if part)
+        db.commit()
+    return RedirectResponse("/?tab=contas-receber", status_code=303)
+
+
 @app.post("/receivables/{receivable_id}/update")
 def update_receivable(
     request: Request,
@@ -1020,6 +1126,60 @@ def update_receivable(
         row.interest_value = interest_value
         db.commit()
     return RedirectResponse("/?tab=contas-receber", status_code=303)
+
+
+@app.post("/notes")
+def create_note(
+    request: Request,
+    title: str = Form(""),
+    content: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    db.add(CompanyNote(company_id=company.id, title=title.strip(), content=content.strip()))
+    db.commit()
+    return RedirectResponse("/?tab=dashboard", status_code=303)
+
+
+@app.post("/tasks")
+def create_task(
+    request: Request,
+    due_date: str = Form(""),
+    description: str = Form(...),
+    priority: str = Form("Normal"),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    db.add(
+        CompanyTask(
+            company_id=company.id,
+            due_date=parse_filter_date(due_date),
+            description=description.strip(),
+            priority=priority if priority in {"Baixa", "Normal", "Alta"} else "Normal",
+            status="Pendente",
+        )
+    )
+    db.commit()
+    return RedirectResponse("/?tab=dashboard", status_code=303)
+
+
+@app.post("/tasks/{task_id}/done")
+def complete_task(request: Request, task_id: int, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    task = db.scalar(select(CompanyTask).where(CompanyTask.company_id == company.id, CompanyTask.id == task_id))
+    if task:
+        task.status = "Concluida"
+        db.commit()
+    return RedirectResponse("/?tab=dashboard", status_code=303)
 
 
 @app.post("/debts")
@@ -1205,6 +1365,7 @@ def create_anticipation(
     counterparty: str = Form(...),
     counterparty_type: str = Form("Empresa"),
     title_value: float = Form(0),
+    advanced_value: float = Form(0),
     title_fee_rate: float = Form(0),
     interest_rate: float = Form(0),
     iof_value: float = Form(0),
@@ -1216,6 +1377,7 @@ def create_anticipation(
     if isinstance(context, RedirectResponse):
         return context
     _user, company = context
+    estimated_cost = anticipation_cost(title_value, title_fee_rate, interest_rate, iof_value, costs_value)
     db.add(
         Anticipation(
             company_id=company.id,
@@ -1223,6 +1385,7 @@ def create_anticipation(
             counterparty=counterparty.strip(),
             counterparty_type=counterparty_type,
             title_value=title_value,
+            advanced_value=advanced_value if advanced_value > 0 else max(title_value - estimated_cost, 0),
             title_fee_rate=title_fee_rate,
             interest_rate=interest_rate,
             iof_value=iof_value,

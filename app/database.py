@@ -74,3 +74,13 @@ def ensure_lightweight_migrations():
             for name, ddl in new_columns.items():
                 if name not in existing_columns:
                     connection.execute(text(f"ALTER TABLE import_batches ADD COLUMN {name} {ddl}"))
+
+        if "anticipations" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("anticipations")}
+            new_columns = {
+                "receivable_id": "INTEGER",
+                "advanced_value": "FLOAT DEFAULT 0",
+            }
+            for name, ddl in new_columns.items():
+                if name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE anticipations ADD COLUMN {name} {ddl}"))

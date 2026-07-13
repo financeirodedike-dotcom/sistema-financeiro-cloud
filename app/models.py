@@ -226,6 +226,32 @@ class Receivable(Base):
     account: Mapped[FinancialAccount | None] = relationship()
 
 
+class CompanyNote(Base):
+    __tablename__ = "company_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    title: Mapped[str] = mapped_column(String(160), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
+class CompanyTask(Base):
+    __tablename__ = "company_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    description: Mapped[str] = mapped_column(String(240), default="")
+    priority: Mapped[str] = mapped_column(String(40), default="Normal")
+    status: Mapped[str] = mapped_column(String(40), default="Pendente")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class Debt(Base):
     __tablename__ = "debts"
 
@@ -253,10 +279,12 @@ class Anticipation(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    receivable_id: Mapped[int | None] = mapped_column(ForeignKey("receivables.id"), nullable=True)
     anticipation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     counterparty: Mapped[str] = mapped_column(String(160), index=True)
     counterparty_type: Mapped[str] = mapped_column(String(60), default="Empresa")
     title_value: Mapped[float] = mapped_column(Float, default=0)
+    advanced_value: Mapped[float] = mapped_column(Float, default=0)
     title_fee_rate: Mapped[float] = mapped_column(Float, default=0)
     interest_rate: Mapped[float] = mapped_column(Float, default=0)
     iof_value: Mapped[float] = mapped_column(Float, default=0)
@@ -265,6 +293,7 @@ class Anticipation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
+    receivable: Mapped[Receivable | None] = relationship()
 
 
 class AnticipationAttachment(Base):

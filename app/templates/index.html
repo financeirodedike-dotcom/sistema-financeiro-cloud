@@ -228,6 +228,72 @@
         <div class="kpi"><span>Resultado</span><strong class="{{ 'negative' if dashboard.resultado < 0 else 'positive' }}">{{ dashboard.resultado|brl }}</strong></div>
         <div class="kpi"><span>A CLASSIFICAR</span><strong>{{ dashboard.pendentes }}</strong></div>
       </div>
+      <div class="three">
+        <div class="panel">
+          <h2>Anotacoes rapidas</h2>
+          <form action="/notes" method="post">
+            <input name="title" placeholder="Titulo da anotacao">
+            <input name="content" placeholder="Escreva uma anotacao importante" required>
+            <button type="submit">Salvar</button>
+          </form>
+          <table>
+            <tbody>
+              {% for note in notes %}
+              <tr><td><strong>{{ note.title or "Anotacao" }}</strong><br><span class="muted">{{ note.content }}</span></td><td>{{ note.created_at|date_br }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Tarefas a fazer</h2>
+          <form action="/tasks" method="post">
+            <input name="due_date" type="text" inputmode="numeric" placeholder="Data dd/mm/aaaa">
+            <input name="description" placeholder="Tarefa" required>
+            <select name="priority">
+              <option value="Normal">Normal</option>
+              <option value="Alta">Alta</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+            <button type="submit">Adicionar</button>
+          </form>
+          <table>
+            <tbody>
+              {% for task in control_agenda.week_tasks[:8] %}
+              <tr>
+                <td>{{ task.due_date|date_br }}</td>
+                <td>{{ task.description }} <span class="pill">{{ task.priority }}</span></td>
+                <td><form action="/tasks/{{ task.id }}/done" method="post"><button type="submit">OK</button></form></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="panel insight">
+          <h2>Hoje e proximos 7 dias</h2>
+          <table>
+            <tbody>
+              <tr><td>Boletos/contas a pagar hoje</td><td class="negative">{{ control_agenda.payable_today_total|brl }}</td></tr>
+              <tr><td>A receber hoje</td><td class="positive">{{ control_agenda.receivable_today_total|brl }}</td></tr>
+              <tr><td>A pagar na semana</td><td>{{ control_agenda.payable_week_total|brl }}</td></tr>
+              <tr><td>A receber na semana</td><td>{{ control_agenda.receivable_week_total|brl }}</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Esta janela junta tarefas, contas a pagar e contas a receber para voce abrir o sistema ja sabendo o que precisa de atencao.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Calendario operacional da semana</h2>
+        <div class="calendar-grid">
+          {% for day in control_agenda.calendar_days %}
+          <div class="calendar-day {{ 'highlight' if day.date == control_agenda.today else '' }}">
+            <strong>{{ day.date|date_br }}</strong>
+            <span>Pagar: {{ day.payable_total|brl }} em {{ day.payables|length }} item(ns)</span>
+            <span>Receber: {{ day.receivable_total|brl }} em {{ day.receivables|length }} item(ns)</span>
+            <span>Tarefas: {{ day.tasks|length }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
       <div class="panel insight">
         <h2>Leitura rapida do caixa</h2>
         <p class="money-formula">Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = {{ cashflow_totals.saldo_periodo|brl }}</p>
@@ -896,6 +962,17 @@
           <button type="submit">Salvar titulo</button>
         </form>
       </div>
+      <div class="panel insight">
+        <h2>Simulador de antecipacao</h2>
+        <form class="anticipation-simulator">
+          <input id="sim-title-value" type="number" step="0.01" placeholder="Valor dos titulos">
+          <input id="sim-rate" type="number" step="0.01" placeholder="% juros/desconto">
+          <input id="sim-iof" type="number" step="0.01" placeholder="IOF">
+          <input id="sim-costs" type="number" step="0.01" placeholder="Custas">
+          <button type="button" onclick="simulateAnticipation()">Simular</button>
+        </form>
+        <p class="money-formula" id="sim-result">Informe os valores para calcular o liquido estimado.</p>
+      </div>
       <div class="two">
         <div class="panel">
           <h2>Lancamentos a receber</h2>
@@ -953,6 +1030,26 @@
                       <input name="interest_value" type="number" step="0.01" value="{{ item.interest_value }}">
                       <button type="submit">OK</button>
                     </form>
+                    <details class="debt-edit">
+                      <summary>Antecipar</summary>
+                      <form action="/receivables/{{ item.id }}/anticipate" method="post">
+                        <input name="anticipation_date" type="text" inputmode="numeric" placeholder="Data dd/mm/aaaa">
+                        <input name="counterparty" placeholder="Empresa/pessoa que antecipou" required>
+                        <select name="counterparty_type">
+                          <option value="Empresa">Empresa</option>
+                          <option value="Pessoa Fisica">Pessoa Fisica</option>
+                          <option value="Banco">Banco</option>
+                          <option value="Factor">Factor</option>
+                        </select>
+                        <input name="advanced_value" type="number" step="0.01" placeholder="Valor antecipado final">
+                        <input name="interest_rate" type="number" step="0.01" placeholder="% juros pagos">
+                        <input name="title_fee_rate" type="number" step="0.01" placeholder="% taxa dos titulos">
+                        <input name="iof_value" type="number" step="0.01" placeholder="IOF">
+                        <input name="costs_value" type="number" step="0.01" placeholder="Custas">
+                        <input name="notes" placeholder="Observacoes">
+                        <button type="submit">Lancar antecipacao</button>
+                      </form>
+                    </details>
                   </td>
                 </tr>
                 {% endfor %}
@@ -1017,6 +1114,7 @@
               <option value="Factor">Factor</option>
             </select>
             <input name="title_value" type="number" step="0.01" placeholder="Valor dos titulos">
+            <input name="advanced_value" type="number" step="0.01" placeholder="Valor antecipado final">
             <input name="title_fee_rate" type="number" step="0.01" placeholder="Taxa dos titulos %">
             <input name="interest_rate" type="number" step="0.01" placeholder="Taxa de juros %">
             <input name="iof_value" type="number" step="0.01" placeholder="IOF">
@@ -1033,15 +1131,17 @@
       <div class="panel">
         <h2>Historico de antecipacoes</h2>
         <table>
-          <thead><tr><th>Data</th><th>Empresa/Pessoa</th><th>Tipo</th><th>Titulos</th><th>Taxa titulos</th><th>Juros</th><th>IOF</th><th>Custas</th><th>Custo total</th><th>Liquido</th><th>Anexos</th></tr></thead>
+          <thead><tr><th>Data</th><th>Origem</th><th>Empresa/Pessoa</th><th>Tipo</th><th>Titulos</th><th>Antecipado final</th><th>Taxa titulos</th><th>Juros</th><th>IOF</th><th>Custas</th><th>Custo total</th><th>Liquido estimado</th><th>Anexos</th></tr></thead>
           <tbody>
             {% for row in anticipations %}
             {% set total_cost = (row.title_value * (row.title_fee_rate / 100)) + (row.title_value * (row.interest_rate / 100)) + row.iof_value + row.costs_value %}
             <tr>
               <td>{{ row.anticipation_date|date_br }}</td>
+              <td>{{ row.receivable.customer_name if row.receivable else "Manual" }}</td>
               <td>{{ row.counterparty }}</td>
               <td>{{ row.counterparty_type }}</td>
               <td>{{ row.title_value|brl }}</td>
+              <td>{{ row.advanced_value|brl }}</td>
               <td>{{ "%.2f"|format(row.title_fee_rate) }}%</td>
               <td>{{ "%.2f"|format(row.interest_rate) }}%</td>
               <td>{{ row.iof_value|brl }}</td>
@@ -1784,6 +1884,27 @@
         document.getElementById("account-cashflow").value = button.dataset.cashflow;
       });
     });
+
+    function parseNumberField(id) {
+      const value = document.getElementById(id)?.value || "0";
+      return Number(value.replace(",", ".")) || 0;
+    }
+
+    function formatBRL(value) {
+      return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    function simulateAnticipation() {
+      const titleValue = parseNumberField("sim-title-value");
+      const rate = parseNumberField("sim-rate");
+      const iof = parseNumberField("sim-iof");
+      const costs = parseNumberField("sim-costs");
+      const discount = titleValue * (rate / 100);
+      const totalCost = discount + iof + costs;
+      const net = Math.max(titleValue - totalCost, 0);
+      document.getElementById("sim-result").textContent =
+        `Custo estimado ${formatBRL(totalCost)} | Liquido estimado ${formatBRL(net)}`;
+    }
   </script>
 </body>
 </html>
