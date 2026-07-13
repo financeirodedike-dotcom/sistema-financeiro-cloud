@@ -1577,7 +1577,7 @@
               <td>{{ "%.2f"|format(debt.monthly_interest_rate) }}% {{ debt.interest_type }}</td>
               <td>{{ debt.installment_value|brl }}</td>
               <td>{{ debt.status }}</td>
-              <td><a class="pill" href="/?tab=endividamento&debt_report={{ debt.id }}&debt_months={{ debt_report_months }}">Gerar evolucao</a></td>
+              <td><a class="pill" href="/?tab=endividamento&debt_report={{ debt.id }}&debt_months=120">Gerar evolucao</a></td>
               <td>
                 <details class="debt-edit">
                   <summary>Editar</summary>
@@ -1618,6 +1618,7 @@
       </div>
       <div class="panel">
         <h2>Relatorio de evolucao da divida</h2>
+        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, com juros proporcionais pelos dias de cada periodo.</p>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="endividamento">
           <select name="debt_report">
@@ -1626,27 +1627,64 @@
             <option value="{{ debt.id }}" {% if debt_report.debt and debt_report.debt.id == debt.id %}selected{% endif %}>{{ debt.creditor }} - {{ debt.description }}</option>
             {% endfor %}
           </select>
-          <input name="debt_months" type="number" min="1" max="120" value="{{ debt_report.months }}" placeholder="Meses">
-          <button type="submit">Gerar relatorio</button>
+          <input name="debt_months" type="number" min="1" max="120" value="{{ debt_report.months }}" placeholder="Limite de periodos">
+          <button type="submit">Gerar evolucao</button>
         </form>
         {% if debt_report.debt %}
-        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}.</p>
+        <div class="grid">
+          <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
+          <div class="kpi"><span>Total de juros</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
+          <div class="kpi"><span>Total pago</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
+          <div class="kpi"><span>A pagar hoje</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
+        </div>
+        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Referencia: {{ debt_report.summary.reference_date|date_br }}.</p>
+        <div class="scroll">
         <table>
-          <thead><tr><th>Mes</th><th>Saldo inicial</th><th>Juros</th><th>Parcela</th><th>Saldo final</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Descricao</th>
+              <th>Data do desc.</th>
+              <th>Vencimento</th>
+              <th>Dias</th>
+              <th>Valor</th>
+              <th>Taxa</th>
+              <th>Ao dia</th>
+              <th>Total juros</th>
+              <th>Valor do credito</th>
+              <th>Pago</th>
+              <th>A pagar</th>
+            </tr>
+          </thead>
           <tbody>
             {% for row in debt_report.rows %}
             <tr>
-              <td>{{ row.month|month_br }}</td>
+              <td>{{ debt_report.debt.description or debt_report.debt.creditor }}</td>
+              <td>{{ row.period_start|date_br }}</td>
+              <td>{{ row.due_date|date_br }}</td>
+              <td>{{ row.days }}</td>
               <td>{{ row.opening_balance|brl }}</td>
+              <td>{{ "%.2f"|format(row.rate_pct) }}%</td>
+              <td>{{ row.daily_interest|brl }}</td>
               <td>{{ row.interest|brl }}</td>
-              <td>{{ row.installment|brl }}</td>
+              <td>{{ row.credit_value|brl }}</td>
+              <td class="positive">{{ row.installment|brl }}</td>
               <td class="{{ 'negative' if row.closing_balance > 0 else 'positive' }}">{{ row.closing_balance|brl }}</td>
             </tr>
             {% endfor %}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="7">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
+              <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
+              <td></td>
+              <td class="positive">{{ debt_report.summary.total_paid|brl }}</td>
+              <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
+            </tr>
+          </tfoot>
         </table>
+        </div>
         {% else %}
-        <p class="muted">Escolha uma divida para ver a evolucao mensal com juros simples ou compostos.</p>
+        <p class="muted">Escolha uma divida para ver a evolucao desde o inicio ate hoje, com juros simples ou compostos.</p>
         {% endif %}
       </div>
     </section>

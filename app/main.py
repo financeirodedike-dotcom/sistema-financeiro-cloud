@@ -565,7 +565,7 @@ def home(request: Request, db: Session = Depends(get_db)):
     ]
     purchases_report = purchases(db, company.id)
     report_debt_id = request.query_params.get("debt_report")
-    report_months_raw = request.query_params.get("debt_months", "12")
+    report_months_raw = request.query_params.get("debt_months", "120")
     try:
         report_months = int(report_months_raw)
     except ValueError:

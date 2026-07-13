@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from calendar import monthrange
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -315,34 +316,71 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
     }
 
 
-def debt_evolution(debt: Debt | None, months: int = 12) -> dict:
+def add_months(value: date, months: int = 1) -> date:
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | None = None) -> dict:
+    reference_date = reference_date or date.today()
     if not debt:
-        return {"debt": None, "rows": [], "months": months}
+        return {"debt": None, "rows": [], "months": months, "summary": {}}
 
     months = max(1, min(months, 120))
     capital = debt.capital_value or 0
     rate = (debt.monthly_interest_rate or 0) / 100
     installment = debt.installment_value or 0
+    start_date = debt.debt_date or debt.due_date or reference_date
+    first_due_date = debt.due_date or add_months(start_date)
     balance = capital
     rows = []
 
+    period_start = start_date
+    period_due = first_due_date
     for month in range(1, months + 1):
+        if period_start > reference_date or balance <= 0:
+            break
+        period_end = min(period_due, reference_date)
+        days = max((period_end - period_start).days, 0)
         opening_balance = balance
-        if debt.interest_type == "Simples":
-            interest = capital * rate
-        else:
-            interest = opening_balance * rate
-        balance = max(opening_balance + interest - installment, 0)
+        interest_base = capital if debt.interest_type == "Simples" else opening_balance
+        daily_interest = (interest_base * rate) / 30 if rate else 0
+        interest = daily_interest * days
+        credit_value = opening_balance + interest
+        payment = min(installment, credit_value) if installment > 0 and period_due <= reference_date else 0
+        balance = max(credit_value - payment, 0)
         rows.append(
             {
                 "month": month,
+                "period_start": period_start,
+                "due_date": period_due,
+                "days": days,
                 "opening_balance": opening_balance,
+                "rate_pct": debt.monthly_interest_rate or 0,
+                "daily_interest": daily_interest,
                 "interest": interest,
-                "installment": installment,
+                "credit_value": credit_value,
+                "installment": payment,
                 "closing_balance": balance,
             }
         )
-    return {"debt": debt, "rows": rows, "months": months}
+        period_start = period_due
+        period_due = add_months(period_due)
+    return {
+        "debt": debt,
+        "rows": rows,
+        "months": months,
+        "summary": {
+            "reference_date": reference_date,
+            "total_interest": sum(row["interest"] for row in rows),
+            "total_paid": sum(row["installment"] for row in rows),
+            "final_balance": rows[-1]["closing_balance"] if rows else capital,
+            "rows_count": len(rows),
+        },
+    }
 
 
 def debt_months_elapsed(debt: Debt, reference_date: date | None = None) -> int:
@@ -367,26 +405,13 @@ def current_debt_position(debt: Debt, reference_date: date | None = None) -> dic
             "reference_date": reference_date,
         }
 
-    months = debt_months_elapsed(debt, reference_date)
-    capital = debt.capital_value or 0
-    rate = (debt.monthly_interest_rate or 0) / 100
-    installment = debt.installment_value or 0
-    balance = capital
-    interest_total = 0
-    paid_total = 0
-
-    for _month in range(months):
-        opening_balance = balance
-        interest = capital * rate if debt.interest_type == "Simples" else opening_balance * rate
-        payment = min(installment, opening_balance + interest) if installment > 0 else 0
-        balance = max(opening_balance + interest - payment, 0)
-        interest_total += interest
-        paid_total += payment
+    evolution = debt_evolution(debt, 120, reference_date)
+    summary = evolution["summary"]
 
     return {
-        "months_elapsed": months,
-        "interest_total": interest_total,
-        "paid_total": paid_total,
-        "current_balance": balance,
+        "months_elapsed": summary["rows_count"],
+        "interest_total": summary["total_interest"],
+        "paid_total": summary["total_paid"],
+        "current_balance": summary["final_balance"],
         "reference_date": reference_date,
     }
