@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
@@ -563,7 +563,14 @@ def home(request: Request, db: Session = Depends(get_db)):
         accounted_account_id = None
     date_from = parse_filter_date(date_from_raw)
     date_to = parse_filter_date(date_to_raw)
-    transaction_query = select(Transaction).where(Transaction.company_id == company.id)
+    transaction_query = (
+        select(Transaction)
+        .where(Transaction.company_id == company.id)
+        .options(
+            selectinload(Transaction.account),
+            selectinload(Transaction.splits).selectinload(TransactionSplit.account),
+        )
+    )
     if date_from:
         transaction_query = transaction_query.where(Transaction.date >= date_from)
     if date_to:
@@ -578,6 +585,14 @@ def home(request: Request, db: Session = Depends(get_db)):
         sort_order = "desc"
         transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
     transaction_rows = db.scalars(transaction_query.limit(2000)).all()
+    report_transactions = db.scalars(
+        select(Transaction)
+        .where(Transaction.company_id == company.id)
+        .options(
+            selectinload(Transaction.account),
+            selectinload(Transaction.splits).selectinload(TransactionSplit.account),
+        )
+    ).all()
     accounted_transactions = [row for row in transaction_rows if is_transaction_accounted(row)]
     accounted_groups = build_accounted_groups(accounted_transactions, accounted_account_id)
     transactions = [row for row in transaction_rows if not is_transaction_accounted(row)]
@@ -646,7 +661,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         {"debt": debt, "overdue_days": debt_overdue_days(debt), "position": current_debt_position(debt)}
         for debt in debts
     ]
-    purchases_report = purchases(db, company.id)
+    purchases_report = purchases(db, company.id, report_transactions)
     report_debt_id = request.query_params.get("debt_report")
     report_months_raw = request.query_params.get("debt_months", "120")
     try:
@@ -659,7 +674,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
         except ValueError:
             selected_debt = None
-    cashflow_report = monthly_cashflow(db, company.id)
+    cashflow_report = monthly_cashflow(db, company.id, report_transactions)
     cashflow_totals = {
         "saldo_inicial": cashflow_report[0]["saldo_inicial"] if cashflow_report else 0,
         "entradas": sum(row["entradas"] for row in cashflow_report),
@@ -731,17 +746,17 @@ def home(request: Request, db: Session = Depends(get_db)):
                 "accounted_account_id": str(accounted_account_id or ""),
             },
             "active_tab": request.query_params.get("tab", "dashboard"),
-            "dashboard": dashboard(db, company.id),
+            "dashboard": dashboard(db, company.id, report_transactions),
             "cashflow": cashflow_report,
             "cashflow_totals": cashflow_totals,
-            "cashflow_diagnostics": cashflow_diagnostics(db, company.id),
+            "cashflow_diagnostics": cashflow_diagnostics(db, company.id, report_transactions),
             "cashflow_explanation": cashflow_explanation,
-            "planned_cashflow": planned_cashflow(db, company.id),
-            "bank_reconciliation": bank_reconciliation_report(db, company.id),
-            "dre": dre(db, company.id),
-            "balance": balance_sheet(db, company.id),
+            "planned_cashflow": planned_cashflow(db, company.id, cashflow_report),
+            "bank_reconciliation": bank_reconciliation_report(db, company.id, report_transactions),
+            "dre": dre(db, company.id, report_transactions),
+            "balance": balance_sheet(db, company.id, report_transactions),
             "purchases": purchases_report,
-            "charts": dashboard_charts(db, company.id),
+            "charts": dashboard_charts(db, company.id, cashflow_report, report_transactions),
         },
     )
 

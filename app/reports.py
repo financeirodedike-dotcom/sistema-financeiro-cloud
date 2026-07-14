@@ -3,9 +3,20 @@ from datetime import date
 from calendar import monthrange
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.models import BankReconciliation, CashflowPlan, Debt, FinancialAccount, Transaction
+from app.models import BankReconciliation, CashflowPlan, Debt, FinancialAccount, Transaction, TransactionSplit
+
+
+def load_transactions(db: Session, company_id: int) -> list[Transaction]:
+    return db.scalars(
+        select(Transaction)
+        .where(Transaction.company_id == company_id)
+        .options(
+            selectinload(Transaction.account),
+            selectinload(Transaction.splits).selectinload(TransactionSplit.account),
+        )
+    ).all()
 
 
 def transaction_is_accounted(row: Transaction) -> bool:
@@ -39,8 +50,8 @@ def classified_entries(rows: list[Transaction]) -> list[dict]:
     return entries
 
 
-def dashboard(db: Session, company_id: int) -> dict:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def dashboard(db: Session, company_id: int, rows: list[Transaction] | None = None) -> dict:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     receitas = sum(row.entrada for row in rows)
     despesas = sum(row.saida for row in rows)
     pendentes = sum(1 for row in rows if not transaction_is_accounted(row))
@@ -54,8 +65,8 @@ def dashboard(db: Session, company_id: int) -> dict:
     }
 
 
-def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def monthly_cashflow(db: Session, company_id: int, rows: list[Transaction] | None = None) -> list[dict]:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     reconciliations = db.scalars(
         select(BankReconciliation).where(BankReconciliation.company_id == company_id)
     ).all()
@@ -91,8 +102,8 @@ def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
     return output
 
 
-def cashflow_diagnostics(db: Session, company_id: int) -> dict:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def cashflow_diagnostics(db: Session, company_id: int, rows: list[Transaction] | None = None) -> dict:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     entries = classified_entries(rows)
     by_month = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
     by_bank = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
@@ -154,8 +165,8 @@ def cashflow_diagnostics(db: Session, company_id: int) -> dict:
     }
 
 
-def planned_cashflow(db: Session, company_id: int) -> dict:
-    actual_rows = monthly_cashflow(db, company_id)
+def planned_cashflow(db: Session, company_id: int, actual_rows: list[dict] | None = None) -> dict:
+    actual_rows = actual_rows if actual_rows is not None else monthly_cashflow(db, company_id)
     actual_by_month = {row["month"]: row for row in actual_rows}
     plans = db.scalars(
         select(CashflowPlan).where(CashflowPlan.company_id == company_id).order_by(CashflowPlan.month.desc())
@@ -193,8 +204,8 @@ def planned_cashflow(db: Session, company_id: int) -> dict:
     return {"rows": rows, "totals": totals}
 
 
-def bank_reconciliation_report(db: Session, company_id: int) -> dict:
-    transactions = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def bank_reconciliation_report(db: Session, company_id: int, transactions: list[Transaction] | None = None) -> dict:
+    transactions = transactions if transactions is not None else load_transactions(db, company_id)
     reconciliations = db.scalars(
         select(BankReconciliation).where(BankReconciliation.company_id == company_id).order_by(BankReconciliation.month.desc(), BankReconciliation.bank)
     ).all()
@@ -237,8 +248,8 @@ def bank_reconciliation_report(db: Session, company_id: int) -> dict:
     return {"rows": rows[:120], "totals": totals}
 
 
-def dre(db: Session, company_id: int) -> list[dict]:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def dre(db: Session, company_id: int, rows: list[Transaction] | None = None) -> list[dict]:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     lines = defaultdict(float)
     for entry in classified_entries(rows):
         account = entry["account"]
@@ -290,8 +301,8 @@ def dre(db: Session, company_id: int) -> list[dict]:
     ]
 
 
-def purchases(db: Session, company_id: int) -> dict:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id).order_by(Transaction.date.desc())).all()
+def purchases(db: Session, company_id: int, rows: list[Transaction] | None = None) -> dict:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     purchase_entries = [
         entry
         for entry in classified_entries(rows)
@@ -301,8 +312,8 @@ def purchases(db: Session, company_id: int) -> dict:
     return {"rows": purchase_entries, "total": total, "count": len(purchase_entries)}
 
 
-def balance_sheet(db: Session, company_id: int) -> dict:
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+def balance_sheet(db: Session, company_id: int, rows: list[Transaction] | None = None) -> dict:
+    rows = rows if rows is not None else load_transactions(db, company_id)
     debts = db.scalars(select(Debt).where(Debt.company_id == company_id, Debt.status == "Ativo")).all()
     cash_balance = sum(row.entrada - row.saida for row in rows)
     debt_total = sum(current_debt_position(row)["current_balance"] for row in debts)
@@ -316,8 +327,13 @@ def balance_sheet(db: Session, company_id: int) -> dict:
     }
 
 
-def dashboard_charts(db: Session, company_id: int) -> dict:
-    cashflow = monthly_cashflow(db, company_id)
+def dashboard_charts(
+    db: Session,
+    company_id: int,
+    cashflow: list[dict] | None = None,
+    rows: list[Transaction] | None = None,
+) -> dict:
+    cashflow = cashflow if cashflow is not None else monthly_cashflow(db, company_id)
     max_flow = max([row["entradas"] for row in cashflow] + [row["saidas"] for row in cashflow] + [1])
     flow_rows = [
         {
@@ -328,7 +344,7 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
         for row in cashflow[-12:]
     ]
 
-    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    rows = rows if rows is not None else load_transactions(db, company_id)
     by_group = defaultdict(float)
     for entry in classified_entries(rows):
         if entry["saida"] <= 0:
