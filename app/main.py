@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
-from app.ofx_parser import parse_ofx, parse_ofx_balances
+from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
+from app.ofx_parser import parse_ofx, parse_ofx_account_info, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
@@ -164,6 +164,97 @@ def bank_source_label(bank_account: str, bank_other: str = "", agency: str = "",
     if details:
         return f"{source} | {' | '.join(details)}"
     return source
+
+
+def bank_account_display_name(bank_name: str, agency: str = "", account_number: str = "") -> str:
+    parts = [bank_name.strip() or "Banco nao informado"]
+    if agency.strip():
+        parts.append(f"Ag: {agency.strip()}")
+    if account_number.strip():
+        parts.append(f"Conta: {account_number.strip()}")
+    return " | ".join(parts)
+
+
+def upsert_bank_account(
+    db: Session,
+    company: Company,
+    bank_name: str,
+    agency: str = "",
+    account_number: str = "",
+    account_type: str = "",
+    source: str = "Manual",
+    notes: str = "",
+) -> BankAccount | None:
+    bank_name = bank_name.strip()
+    agency = agency.strip()
+    account_number = account_number.strip()
+    account_type = account_type.strip()
+    if not bank_name and not agency and not account_number:
+        return None
+    bank_name = bank_name or "Banco nao informado"
+    row = db.scalar(
+        select(BankAccount).where(
+            BankAccount.company_id == company.id,
+            BankAccount.bank_name == bank_name,
+            BankAccount.agency == agency,
+            BankAccount.account_number == account_number,
+        )
+    )
+    if row is None:
+        row = BankAccount(
+            company_id=company.id,
+            bank_name=bank_name,
+            agency=agency,
+            account_number=account_number,
+        )
+        db.add(row)
+    row.account_type = account_type or row.account_type or ""
+    row.display_name = bank_account_display_name(bank_name, agency, account_number)
+    row.source = source or row.source or "Manual"
+    row.notes = notes.strip() if notes else row.notes or ""
+    row.updated_at = datetime.utcnow()
+    return row
+
+
+def resolve_import_bank_account(
+    db: Session,
+    company: Company,
+    registered_bank_account_id: str,
+    bank_account: str,
+    bank_other: str,
+    bank_agency: str,
+    bank_account_number: str,
+    ofx_info: dict | None = None,
+) -> str:
+    if registered_bank_account_id:
+        try:
+            registered = db.scalar(
+                select(BankAccount).where(
+                    BankAccount.company_id == company.id,
+                    BankAccount.id == int(registered_bank_account_id),
+                )
+            )
+        except ValueError:
+            registered = None
+        if registered:
+            return registered.display_name
+
+    ofx_info = ofx_info or {}
+    bank_name = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    bank_name = bank_name or (f"Banco {ofx_info.get('bank_id')}" if ofx_info.get("bank_id") else "")
+    agency = bank_agency.strip() or ofx_info.get("agency", "")
+    account_number = bank_account_number.strip() or ofx_info.get("account_number", "")
+    bank_record = upsert_bank_account(
+        db,
+        company,
+        bank_name,
+        agency,
+        account_number,
+        ofx_info.get("account_type", ""),
+        "OFX" if any(ofx_info.values()) else "Importacao",
+        "Autocadastrado na importacao OFX" if any(ofx_info.values()) else "Criado na importacao",
+    )
+    return bank_record.display_name if bank_record else bank_source_label(bank_account, bank_other, bank_agency, bank_account_number)
 
 
 def parse_filter_date(value: str | None) -> date | None:
@@ -1003,6 +1094,15 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         if active_tab in {"extratos", "contabilizados", "conciliacao"}
         else []
     )
+    bank_accounts = (
+        db.scalars(
+            select(BankAccount)
+            .where(BankAccount.company_id == company.id)
+            .order_by(BankAccount.display_name)
+        ).all()
+        if active_tab in {"extratos", "conciliacao"}
+        else []
+    )
     imports = (
         db.scalars(
             select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
@@ -1223,6 +1323,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             "debt_report_months": report_months,
             "bank_sources": BANK_SOURCES,
             "bank_options": bank_options,
+            "bank_accounts": bank_accounts,
             "filters": {
                 "date_from": date_from_raw,
                 "date_to": date_to_raw,
@@ -1252,6 +1353,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
 async def import_ofx(
     request: Request,
     file: UploadFile = File(...),
+    registered_bank_account_id: str = Form(""),
     bank_account: str = Form(""),
     bank_other: str = Form(""),
     bank_agency: str = Form(""),
@@ -1265,7 +1367,17 @@ async def import_ofx(
     content = await file.read()
     parsed = parse_ofx(content, file.filename or "arquivo.ofx")
     ofx_balances = parse_ofx_balances(content)
-    source = bank_source_label(bank_account, bank_other, bank_agency, bank_account_number)
+    ofx_account_info = parse_ofx_account_info(content)
+    source = resolve_import_bank_account(
+        db,
+        company,
+        registered_bank_account_id,
+        bank_account,
+        bank_other,
+        bank_agency,
+        bank_account_number,
+        ofx_account_info,
+    )
     filename = file.filename or "arquivo.ofx"
     batch = ImportBatch(
         company_id=company.id,
@@ -1303,6 +1415,7 @@ async def import_ofx(
 async def import_ofx_balances_only(
     request: Request,
     file: UploadFile = File(...),
+    registered_bank_account_id: str = Form(""),
     bank_account: str = Form(""),
     bank_other: str = Form(""),
     bank_agency: str = Form(""),
@@ -1317,7 +1430,17 @@ async def import_ofx_balances_only(
     filename = file.filename or "arquivo.ofx"
     parsed = parse_ofx(content, filename)
     ofx_balances = parse_ofx_balances(content)
-    source = bank_source_label(bank_account, bank_other, bank_agency, bank_account_number)
+    ofx_account_info = parse_ofx_account_info(content)
+    source = resolve_import_bank_account(
+        db,
+        company,
+        registered_bank_account_id,
+        bank_account,
+        bank_other,
+        bank_agency,
+        bank_account_number,
+        ofx_account_info,
+    )
     reconciliation = update_reconciliation_from_ofx(db, company, source, parsed, ofx_balances, filename)
     db.add(
         ImportBatch(
@@ -1336,6 +1459,34 @@ async def import_ofx_balances_only(
     db.commit()
     balance_imported = 1 if reconciliation else 0
     return RedirectResponse(f"/?tab=conciliacao&balance_imported={balance_imported}", status_code=303)
+
+
+@app.post("/bank-accounts")
+def create_bank_account(
+    request: Request,
+    bank_name: str = Form(...),
+    agency: str = Form(""),
+    account_number: str = Form(""),
+    account_type: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    upsert_bank_account(
+        db,
+        company,
+        bank_name,
+        agency,
+        account_number,
+        account_type,
+        "Manual",
+        notes,
+    )
+    db.commit()
+    return RedirectResponse("/?tab=extratos#extrato-cadastros", status_code=303)
 
 
 @app.post("/transactions/manual")

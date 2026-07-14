@@ -92,6 +92,7 @@ def ensure_lightweight_migrations():
             ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_fitid ON transactions (company_id, fitid)"),
             ("transaction_splits", "CREATE INDEX IF NOT EXISTS idx_transaction_splits_transaction ON transaction_splits (transaction_id)"),
             ("transaction_splits", "CREATE INDEX IF NOT EXISTS idx_transaction_splits_company_account ON transaction_splits (company_id, account_id)"),
+            ("bank_accounts", "CREATE INDEX IF NOT EXISTS idx_bank_accounts_company_display ON bank_accounts (company_id, display_name)"),
             ("import_batches", "CREATE INDEX IF NOT EXISTS idx_import_batches_company_created ON import_batches (company_id, created_at DESC)"),
             ("receivables", "CREATE INDEX IF NOT EXISTS idx_receivables_company_due ON receivables (company_id, due_date DESC)"),
             ("debts", "CREATE INDEX IF NOT EXISTS idx_debts_company_status_due ON debts (company_id, status, due_date)"),

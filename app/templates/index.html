@@ -856,12 +856,24 @@
 
     <section id="extratos" class="tab">
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="status">
+        <a class="pill" href="#extrato-importar">Importar OFX</a>
+        <a class="pill" href="#extrato-cadastros">Cadastros</a>
+        <a class="pill" href="#extrato-pesquisar">Pesquisar</a>
+        <a class="pill" href="#extrato-pendentes">A contabilizar</a>
+      </div>
       <div class="two">
-        <div class="panel">
+        <div class="panel" id="extrato-importar">
           <h2>Importar OFX</h2>
           <form action="/import-ofx" method="post" enctype="multipart/form-data">
-            <select name="bank_account" required>
-              <option value="">Escolha banco/caixa</option>
+            <select name="registered_bank_account_id">
+              <option value="">Usar banco/agencia/conta abaixo ou ler do OFX</option>
+              {% for item in bank_accounts %}
+              <option value="{{ item.id }}">{{ item.display_name }}</option>
+              {% endfor %}
+            </select>
+            <select name="bank_account">
+              <option value="">Ler do OFX ou escolher banco/caixa</option>
               {% for source in bank_sources %}
               <option value="{{ source }}">{{ source }}</option>
               {% endfor %}
@@ -901,7 +913,38 @@
           </form>
         </div>
       </div>
-      <div class="panel">
+      <div class="panel" id="extrato-cadastros">
+        <h2>Cadastros de bancos e contas</h2>
+        <form action="/bank-accounts" method="post">
+          <input name="bank_name" placeholder="Banco ou caixa" required>
+          <input name="agency" placeholder="Agencia">
+          <input name="account_number" placeholder="Conta">
+          <input name="account_type" placeholder="Tipo de conta">
+          <input name="notes" placeholder="Observacoes">
+          <button type="submit">Salvar cadastro</button>
+        </form>
+        <p class="muted">Quando o OFX trouxer banco, agencia e conta, o sistema tambem cadastra automaticamente aqui.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Banco/Caixa</th><th>Agencia</th><th>Conta</th><th>Tipo</th><th>Origem</th><th>Observacoes</th></tr></thead>
+            <tbody>
+              {% for item in bank_accounts %}
+              <tr>
+                <td>{{ item.bank_name }}</td>
+                <td>{{ item.agency }}</td>
+                <td>{{ item.account_number }}</td>
+                <td>{{ item.account_type }}</td>
+                <td>{{ item.source }}</td>
+                <td>{{ item.notes }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6">Nenhum banco ou conta cadastrada ainda.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel" id="extrato-pesquisar">
         <h2>Pesquisar extratos</h2>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="extratos">
@@ -935,7 +978,7 @@
         </form>
         <p class="muted">Depois de salvar, a nova conta ja aparece na lista de classificacao dos lancamentos.</p>
       </div>
-      <div class="panel">
+      <div class="panel" id="extrato-pendentes">
         <h2>Extratos a contabilizar</h2>
         <p class="muted">Aqui ficam apenas os lancamentos ainda pendentes. Depois de classificar ou ratear, eles saem desta tela e aparecem em Financeiro > Contabilizados.</p>
         <form id="bulk-classify-form" action="/transactions/bulk-classify" method="post">

@@ -95,6 +95,27 @@ class ImportBatch(Base):
     company: Mapped[Company] = relationship()
 
 
+class BankAccount(Base):
+    __tablename__ = "bank_accounts"
+    __table_args__ = (
+        UniqueConstraint("company_id", "bank_name", "agency", "account_number", name="uq_bank_account_company_data"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    bank_name: Mapped[str] = mapped_column(String(120), default="")
+    agency: Mapped[str] = mapped_column(String(40), default="")
+    account_number: Mapped[str] = mapped_column(String(60), default="")
+    account_type: Mapped[str] = mapped_column(String(60), default="")
+    display_name: Mapped[str] = mapped_column(String(240), index=True)
+    source: Mapped[str] = mapped_column(String(40), default="Manual")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (UniqueConstraint("company_id", "fitid", "amount", "date", name="uq_transaction_company_fitid"),)

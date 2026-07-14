@@ -4,7 +4,7 @@ from datetime import date
 
 
 def _tag(block: str, tag: str) -> str:
-    match = re.search(rf"<{tag}>(.*?)(?:<|\r|\n)", block, flags=re.IGNORECASE | re.DOTALL)
+    match = re.search(rf"<{tag}>(.*?)(?:<|\r|\n|$)", block, flags=re.IGNORECASE | re.DOTALL)
     return match.group(1).strip() if match else ""
 
 
@@ -51,6 +51,19 @@ def parse_ofx_balances(content: bytes) -> dict:
         "end_date": end_date or balance_date,
         "closing_balance": closing_balance,
         "balance_source": "LEDGERBAL" if ledger_block else "AVAILBAL" if available_block else "",
+    }
+
+
+def parse_ofx_account_info(content: bytes) -> dict:
+    text = _decode(content)
+    bank_block_match = re.search(r"<BANKACCTFROM>(.*?)</BANKACCTFROM>", text, flags=re.IGNORECASE | re.DOTALL)
+    credit_block_match = re.search(r"<CCACCTFROM>(.*?)</CCACCTFROM>", text, flags=re.IGNORECASE | re.DOTALL)
+    block = bank_block_match.group(1) if bank_block_match else credit_block_match.group(1) if credit_block_match else text
+    return {
+        "bank_id": _tag(block, "BANKID"),
+        "agency": _tag(block, "BRANCHID"),
+        "account_number": _tag(block, "ACCTID"),
+        "account_type": _tag(block, "ACCTTYPE"),
     }
 
 
