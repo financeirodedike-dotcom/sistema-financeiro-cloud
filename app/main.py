@@ -154,6 +154,18 @@ BANK_SOURCES = [
 ]
 
 
+def bank_source_label(bank_account: str, bank_other: str = "", agency: str = "", account_number: str = "") -> str:
+    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    details = []
+    if agency.strip():
+        details.append(f"Ag: {agency.strip()}")
+    if account_number.strip():
+        details.append(f"Conta: {account_number.strip()}")
+    if details:
+        return f"{source} | {' | '.join(details)}"
+    return source
+
+
 def parse_filter_date(value: str | None) -> date | None:
     if not value:
         return None
@@ -1242,6 +1254,8 @@ async def import_ofx(
     file: UploadFile = File(...),
     bank_account: str = Form(""),
     bank_other: str = Form(""),
+    bank_agency: str = Form(""),
+    bank_account_number: str = Form(""),
     db: Session = Depends(get_db),
 ):
     context = require_context(request, db)
@@ -1251,7 +1265,7 @@ async def import_ofx(
     content = await file.read()
     parsed = parse_ofx(content, file.filename or "arquivo.ofx")
     ofx_balances = parse_ofx_balances(content)
-    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    source = bank_source_label(bank_account, bank_other, bank_agency, bank_account_number)
     filename = file.filename or "arquivo.ofx"
     batch = ImportBatch(
         company_id=company.id,
@@ -1291,6 +1305,8 @@ async def import_ofx_balances_only(
     file: UploadFile = File(...),
     bank_account: str = Form(""),
     bank_other: str = Form(""),
+    bank_agency: str = Form(""),
+    bank_account_number: str = Form(""),
     db: Session = Depends(get_db),
 ):
     context = require_context(request, db)
@@ -1301,7 +1317,7 @@ async def import_ofx_balances_only(
     filename = file.filename or "arquivo.ofx"
     parsed = parse_ofx(content, filename)
     ofx_balances = parse_ofx_balances(content)
-    source = bank_other.strip() if bank_account == "Outro" and bank_other.strip() else bank_account.strip()
+    source = bank_source_label(bank_account, bank_other, bank_agency, bank_account_number)
     reconciliation = update_reconciliation_from_ofx(db, company, source, parsed, ofx_balances, filename)
     db.add(
         ImportBatch(

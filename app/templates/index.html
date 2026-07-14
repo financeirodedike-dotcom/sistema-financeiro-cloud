@@ -867,10 +867,13 @@
               {% endfor %}
             </select>
             <input name="bank_other" placeholder="Outro banco, se necessario">
+            <input name="bank_agency" placeholder="Agencia">
+            <input name="bank_account_number" placeholder="Conta">
             <input type="file" name="file" accept=".ofx" required>
             <button type="submit">Importar arquivo OFX</button>
           </form>
-          <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros. O sistema ignora repetidos pelo ID do banco e tambem por data + valor + banco + historico.</p>
+          <p class="muted">Escolha a origem do extrato e, se quiser, informe agencia e conta. O sistema salva como Banco | Ag: 0000 | Conta: 00000 para separar filtros, conciliacao e relatorios.</p>
+          <p class="muted">O sistema ignora repetidos pelo ID do banco e tambem por data + valor + banco + historico.</p>
           <p class="muted">Este mesmo importador tambem atualiza os saldos inicial e final quando o OFX trouxer essas informacoes. Assim fica um unico processo: importar lancamentos e atualizar conciliacao.</p>
           {% if request.query_params.get("balance_imported") == "1" %}
           <p class="positive">Saldo do OFX importado para a aba Financeiro > Conciliacao.</p>
