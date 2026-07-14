@@ -205,28 +205,48 @@ def planned_cashflow(db: Session, company_id: int, actual_rows: list[dict] | Non
 
 
 def cashflow_matrix(actual_rows: list[dict], planned_report: dict, transactions: list[Transaction] | None = None) -> dict:
+    return _cashflow_matrix_v2(actual_rows, planned_report, transactions)
+
+
+def _cashflow_matrix_v2(actual_rows: list[dict], planned_report: dict, transactions: list[Transaction] | None = None) -> dict:
     actual_by_month = {row["month"]: row for row in actual_rows}
     planned_by_month = {row["month"]: row for row in planned_report.get("rows", [])}
     entries = classified_entries(transactions or [])
-    account_month_values = defaultdict(lambda: defaultdict(lambda: {"projected": None, "realized": 0}))
+    account_month_values = defaultdict(lambda: defaultdict(lambda: {"projected": None, "realized": 0, "signed": 0}))
     section_account_totals = defaultdict(lambda: defaultdict(float))
 
     def section_for_entry(entry: dict) -> tuple[str, str]:
         account = entry["account"]
         group = account.group_name if account else "A CLASSIFICAR"
+        dre_line = account.dre_line if account else ""
+        cashflow_class = account.cashflow_class if account else ""
+        account_name = account.name if account else "A CLASSIFICAR"
+        group_upper = group.upper()
+        dre_upper = dre_line.upper()
+        cashflow_upper = cashflow_class.upper()
+        name_upper = account_name.upper()
+        loan_keywords = ("EMPREST", "FINANCIAMENTO", "ROTATIVO", "CAPTAC", "CAPTA")
+        financial_keywords = ("JUROS", "TARIFA", "IOF", "TAXA CART", "BORD")
+
+        if any(keyword in name_upper for keyword in loan_keywords):
+            return "BANCOS / EMPRESTIMOS", "banco"
         if entry["entrada"] > 0:
             return "RECEITAS", "entrada"
-        if group == "Custos e Compras":
+        if "CUSTOS" in group_upper or "CUSTOS" in dre_upper:
             return "CUSTOS (Compras)", "saida"
-        if group == "Pessoal":
+        if "PESSOAL" in group_upper or "PESSOAL" in dre_upper or "FOLHA" in dre_upper:
             return "DESPESAS COM PESSOAL", "saida"
-        if group == "Impostos":
+        if "FISCAL" in group_upper or "IMPOST" in group_upper or "IMPOST" in dre_upper:
             return "IMPOSTOS", "saida"
-        if group == "Financeiro":
-            return "FINANCEIRO", "saida"
-        if group == "Transferências":
-            return "TRANSFERÊNCIAS", "transferencia"
-        if group.startswith("Despesas"):
+        if "SOC" in group_upper or "DISTRIB" in dre_upper:
+            return "DISTRIBUICAO TRABALHISTA / SOCIOS", "saida"
+        if "INVEST" in group_upper or "INVEST" in dre_upper or "INVEST" in cashflow_upper:
+            return "INVESTIMENTOS", "investimento"
+        if "FINANCEIRO" in group_upper or "FINANCEIRO" in dre_upper or any(keyword in name_upper for keyword in financial_keywords):
+            return "DESPESAS FINANCEIRAS", "saida"
+        if "TRANSFER" in group_upper or "TRANSFER" in dre_upper:
+            return "BANCOS", "banco"
+        if group_upper.startswith("DESPESAS") or "DESPESAS" in dre_upper:
             return "DESPESAS (pagamentos)", "saida"
         return group.upper(), "saida"
 
@@ -236,10 +256,10 @@ def cashflow_matrix(actual_rows: list[dict], planned_report: dict, transactions:
         account_name = account.name if account else "A CLASSIFICAR"
         month = entry["transaction"].date.strftime("%Y-%m")
         section, kind = section_for_entry(entry)
-        value = entry["entrada"] if entry["entrada"] > 0 else entry["saida"]
-        if kind == "transferencia":
-            value = entry["entrada"] - entry["saida"]
+        signed_value = entry["entrada"] - entry["saida"]
+        value = signed_value if kind == "banco" else entry["entrada"] if entry["entrada"] > 0 else entry["saida"]
         account_month_values[(section, account_name)][month]["realized"] += value
+        account_month_values[(section, account_name)][month]["signed"] += signed_value
         section_account_totals[section][account_name] += value
         section_kinds[section] = kind
 
@@ -278,6 +298,178 @@ def cashflow_matrix(actual_rows: list[dict], planned_report: dict, transactions:
     def add_value_row(label: str, kind: str, projected_getter, realized_getter, row_type: str = "value") -> None:
         cells = build_cells(projected_getter, realized_getter)
         rows.append({"type": row_type, "label": label, "kind": kind, "cells": cells, "total": row_total(cells, kind)})
+
+    def signed_section_sum(month: str, sections: set[str]) -> float:
+        return sum(
+            values.get(month, {}).get("signed", 0) or 0
+            for (entry_section, _account), values in account_month_values.items()
+            if entry_section in sections
+        )
+
+    operational_sections = {
+        "RECEITAS",
+        "CUSTOS (Compras)",
+        "DESPESAS (pagamentos)",
+        "IMPOSTOS",
+        "DESPESAS COM PESSOAL",
+        "DESPESAS FINANCEIRAS",
+        "DISTRIBUICAO TRABALHISTA / SOCIOS",
+    }
+    bank_sections = {"BANCOS", "BANCOS / EMPRESTIMOS"}
+    investment_sections = {"INVESTIMENTOS"}
+
+    rows.append({"type": "section", "label": "RESUMO DO CAIXA", "cells": [None for _month in months], "total": None})
+    add_value_row("Saldo inicial", "saldo", lambda month: actual_value(month, "saldo_inicial"), lambda month: actual_value(month, "saldo_inicial"))
+    add_value_row("Receitas totais", "entrada", lambda month: planned_value(month, "planned_inflows"), lambda month: actual_value(month, "entradas"))
+    add_value_row("Saidas totais", "saida", lambda month: planned_value(month, "planned_outflows"), lambda month: actual_value(month, "saidas"))
+    add_value_row("Sobra/falta operacional", "resultado", lambda month: planned_value(month, "planned_balance"), lambda month: signed_section_sum(month, operational_sections))
+    add_value_row("Sobra/falta apos bancos", "resultado", lambda month: planned_value(month, "planned_balance"), lambda month: signed_section_sum(month, operational_sections | bank_sections))
+    add_value_row("Sobra/falta apos investimentos", "resultado", lambda month: planned_value(month, "planned_balance"), lambda month: signed_section_sum(month, operational_sections | bank_sections | investment_sections))
+    add_value_row("Resultado do mes", "resultado", lambda month: planned_value(month, "planned_balance"), lambda month: actual_value(month, "saldo_mes"))
+    add_value_row("Saldo final", "saldo", lambda month: None, lambda month: actual_value(month, "saldo_final"))
+
+    section_order = [
+        "RECEITAS",
+        "CUSTOS (Compras)",
+        "DESPESAS (pagamentos)",
+        "IMPOSTOS",
+        "DESPESAS COM PESSOAL",
+        "DESPESAS FINANCEIRAS",
+        "DISTRIBUICAO TRABALHISTA / SOCIOS",
+        "BANCOS",
+        "BANCOS / EMPRESTIMOS",
+        "INVESTIMENTOS",
+    ]
+    remaining_sections = sorted(section for section in section_account_totals if section not in section_order)
+    for section in section_order + remaining_sections:
+        account_totals = section_account_totals.get(section)
+        if not account_totals:
+            continue
+        kind = section_kinds.get(section, "saida")
+        rows.append({"type": "section", "label": section, "cells": [None for _month in months], "total": None})
+
+        def section_realized(month: str, section_name: str = section) -> float:
+            return sum(values.get(month, {}).get("realized", 0) or 0 for (entry_section, _account), values in account_month_values.items() if entry_section == section_name)
+
+        add_value_row(f"TOTAL {section}", kind, lambda _month: None, section_realized, "total")
+        for account_name, _total in sorted(account_totals.items(), key=lambda item: item[0]):
+            def account_realized(month: str, section_name: str = section, name: str = account_name) -> float:
+                return account_month_values[(section_name, name)].get(month, {}).get("realized", 0) or 0
+
+            add_value_row(account_name, kind, lambda _month: None, account_realized, "account")
+
+    return {"months": months, "rows": rows}
+
+    actual_by_month = {row["month"]: row for row in actual_rows}
+    planned_by_month = {row["month"]: row for row in planned_report.get("rows", [])}
+    entries = classified_entries(transactions or [])
+    account_month_values = defaultdict(lambda: defaultdict(lambda: {"projected": None, "realized": 0, "signed": 0}))
+    section_account_totals = defaultdict(lambda: defaultdict(float))
+
+    def section_for_entry(entry: dict) -> tuple[str, str]:
+        account = entry["account"]
+        group = account.group_name if account else "A CLASSIFICAR"
+        dre_line = account.dre_line if account else ""
+        cashflow_class = account.cashflow_class if account else ""
+        account_name = account.name if account else "A CLASSIFICAR"
+        group_upper = group.upper()
+        dre_upper = dre_line.upper()
+        cashflow_upper = cashflow_class.upper()
+        name_upper = account_name.upper()
+        loan_keywords = ("EMPREST", "FINANCIAMENTO", "ROTATIVO", "CAPTAC", "CAPTAÇ")
+        financial_keywords = ("JUROS", "TARIFA", "IOF", "TAXA CART", "BORD")
+
+        if any(keyword in name_upper for keyword in loan_keywords):
+            return "BANCOS / EMPRESTIMOS", "banco"
+        if entry["entrada"] > 0:
+            return "RECEITAS", "entrada"
+        if "CUSTOS" in group_upper or "CUSTOS" in dre_upper:
+            return "CUSTOS (Compras)", "saida"
+        if "PESSOAL" in group_upper or "PESSOAL" in dre_upper or "FOLHA" in dre_upper:
+            return "DESPESAS COM PESSOAL", "saida"
+        if "FISCAL" in group_upper or "IMPOST" in group_upper or "IMPOST" in dre_upper:
+            return "IMPOSTOS", "saida"
+        if "SOC" in group_upper or "DISTRIB" in dre_upper:
+            return "DISTRIBUICAO TRABALHISTA / SOCIOS", "saida"
+        if "INVEST" in group_upper or "INVEST" in dre_upper or "INVEST" in cashflow_upper:
+            return "INVESTIMENTOS", "investimento"
+        if "FINANCEIRO" in group_upper or "FINANCEIRO" in dre_upper or any(keyword in name_upper for keyword in financial_keywords):
+            return "DESPESAS FINANCEIRAS", "saida"
+        if "TRANSFER" in group_upper or "TRANSFER" in dre_upper:
+            return "BANCOS", "banco"
+        if group == "Transferências":
+            return "TRANSFERÊNCIAS", "transferencia"
+        if group_upper.startswith("DESPESAS") or "DESPESAS" in dre_upper:
+            return "DESPESAS (pagamentos)", "saida"
+        return group.upper(), "saida"
+
+    section_kinds = {}
+    for entry in entries:
+        account = entry["account"]
+        account_name = account.name if account else "A CLASSIFICAR"
+        month = entry["transaction"].date.strftime("%Y-%m")
+        section, kind = section_for_entry(entry)
+        signed_value = entry["entrada"] - entry["saida"]
+        value = signed_value if kind == "banco" else entry["entrada"] if entry["entrada"] > 0 else entry["saida"]
+        account_month_values[(section, account_name)][month]["realized"] += value
+        account_month_values[(section, account_name)][month]["signed"] += signed_value
+        section_account_totals[section][account_name] += value
+        section_kinds[section] = kind
+
+    months = sorted(
+        set(actual_by_month)
+        | set(planned_by_month)
+        | {month for month_values in account_month_values.values() for month in month_values}
+    )
+
+    def actual_value(month: str, field: str) -> float:
+        return actual_by_month.get(month, {}).get(field, 0) or 0
+
+    def planned_value(month: str, field: str) -> float:
+        return planned_by_month.get(month, {}).get(field, 0) or 0
+
+    rows = []
+
+    def build_cells(projected_getter, realized_getter) -> list[dict]:
+        cells = []
+        for month in months:
+            projected = projected_getter(month)
+            realized = realized_getter(month)
+            variance = None if projected is None else realized - projected
+            cells.append({"projected": projected, "realized": realized, "variance": variance})
+        return cells
+
+    def row_total(cells: list[dict], kind: str) -> dict:
+        if kind == "saldo" and cells:
+            return {"projected": cells[-1]["projected"], "realized": cells[-1]["realized"]}
+        projected_values = [cell["projected"] for cell in cells if cell["projected"] is not None]
+        return {
+            "projected": sum(projected_values) if projected_values else None,
+            "realized": sum(cell["realized"] or 0 for cell in cells),
+        }
+
+    def add_value_row(label: str, kind: str, projected_getter, realized_getter, row_type: str = "value") -> None:
+        cells = build_cells(projected_getter, realized_getter)
+        rows.append({"type": row_type, "label": label, "kind": kind, "cells": cells, "total": row_total(cells, kind)})
+
+    def signed_section_sum(month: str, sections: set[str]) -> float:
+        return sum(
+            values.get(month, {}).get("signed", 0) or 0
+            for (entry_section, _account), values in account_month_values.items()
+            if entry_section in sections
+        )
+
+    operational_sections = {
+        "RECEITAS",
+        "CUSTOS (Compras)",
+        "DESPESAS (pagamentos)",
+        "IMPOSTOS",
+        "DESPESAS COM PESSOAL",
+        "DESPESAS FINANCEIRAS",
+        "DISTRIBUICAO TRABALHISTA / SOCIOS",
+    }
+    bank_sections = {"BANCOS", "BANCOS / EMPRESTIMOS"}
+    investment_sections = {"INVESTIMENTOS"}
 
     rows.append({"type": "section", "label": "RESUMO DO CAIXA", "cells": [None for _month in months], "total": None})
     add_value_row("Saldo inicial", "saldo", lambda month: actual_value(month, "saldo_inicial"), lambda month: actual_value(month, "saldo_inicial"))
