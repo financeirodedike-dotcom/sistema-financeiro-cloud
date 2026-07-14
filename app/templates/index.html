@@ -116,7 +116,6 @@
     #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
     #tab-compras:checked ~ .tabs label[for="tab-compras"],
     #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
-    #tab-caixa-planejado:checked ~ .tabs label[for="tab-caixa-planejado"],
     #tab-conciliacao:checked ~ .tabs label[for="tab-conciliacao"],
     #tab-dre:checked ~ .tabs label[for="tab-dre"],
     #tab-balanco:checked ~ .tabs label[for="tab-balanco"],
@@ -145,7 +144,6 @@
     #tab-classificacao:checked ~ main #classificacao,
     #tab-compras:checked ~ main #compras,
     #tab-fluxo:checked ~ main #fluxo,
-    #tab-caixa-planejado:checked ~ main #caixa-planejado,
     #tab-conciliacao:checked ~ main #conciliacao,
     #tab-dre:checked ~ main #dre,
     #tab-balanco:checked ~ main #balanco,
@@ -337,7 +335,6 @@
   <input id="tab-classificacao" name="tab" type="radio" {% if active_tab == "classificacao" %}checked{% endif %}>
   <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
   <input id="tab-fluxo" name="tab" type="radio" {% if active_tab == "fluxo" %}checked{% endif %}>
-  <input id="tab-caixa-planejado" name="tab" type="radio" {% if active_tab == "caixa-planejado" %}checked{% endif %}>
   <input id="tab-conciliacao" name="tab" type="radio" {% if active_tab == "conciliacao" %}checked{% endif %}>
   <input id="tab-dre" name="tab" type="radio" {% if active_tab == "dre" %}checked{% endif %}>
   <input id="tab-balanco" name="tab" type="radio" {% if active_tab == "balanco" %}checked{% endif %}>
@@ -735,8 +732,7 @@
           <a class="finance-tab" href="/?tab=contas-pagar"><span>07</span> Contas a Pagar</a>
           <a class="finance-tab" href="/?tab=contas-receber"><span>08</span> Contas a Receber</a>
           <a class="finance-tab" href="/?tab=antecipacoes"><span>09</span> Antecipacoes</a>
-          <a class="finance-tab" href="/?tab=caixa-planejado"><span>10</span> Caixa Planejado</a>
-          <a class="finance-tab" href="/?tab=conciliacao"><span>11</span> Conciliacao</a>
+          <a class="finance-tab" href="/?tab=conciliacao"><span>10</span> Conciliacao</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
@@ -755,10 +751,6 @@
           <a class="module-card" href="/?tab=fluxo">
             <strong>Fluxo de Caixa</strong>
             <span>Acompanhe entradas, saidas, saldo do mes e saldo acumulado por competencia.</span>
-          </a>
-          <a class="module-card" href="/?tab=caixa-planejado">
-            <strong>Caixa Planejado</strong>
-            <span>Registre entradas e saidas orcadas por mes e compare com o realizado.</span>
           </a>
           <a class="module-card" href="/?tab=conciliacao">
             <strong>Conciliacao Bancaria</strong>
@@ -1447,19 +1439,15 @@
           </tfoot>
         </table>
       </div>
-    </section>
-
-    <section id="caixa-planejado" class="tab">
-      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
       <div class="panel hero360">
-        <h2>Caixa Planejado e Orcado</h2>
-        <p>Planeje entradas e saidas por mes, compare com o realizado e veja rapidamente se o caixa ficou acima ou abaixo do previsto.</p>
+        <h2>Planejado e Orcado</h2>
+        <p>Registre o caixa previsto por mes e compare com o realizado importado dos extratos, tudo dentro da mesma aba de fluxo de caixa.</p>
         <div class="pillar-grid">
           <div class="pillar"><strong>Entradas orcadas</strong><span>{{ planned_cashflow.totals.planned_inflows|brl }}</span></div>
           <div class="pillar"><strong>Saidas orcadas</strong><span>{{ planned_cashflow.totals.planned_outflows|brl }}</span></div>
           <div class="pillar"><strong>Saldo orcado</strong><span>{{ planned_cashflow.totals.planned_balance|brl }}</span></div>
           <div class="pillar"><strong>Saldo realizado</strong><span>{{ planned_cashflow.totals.actual_balance|brl }}</span></div>
-          <div class="pillar"><strong>Diferenca</strong><span>{{ planned_cashflow.totals.variance|brl }}</span></div>
+          <div class="pillar"><strong>Diferenca</strong><span class="{{ 'negative' if planned_cashflow.totals.variance < 0 else 'positive' }}">{{ planned_cashflow.totals.variance|brl }}</span></div>
         </div>
       </div>
       <div class="two">
@@ -1475,8 +1463,8 @@
           <p class="muted">Se o mes ja existir, o sistema atualiza o orcamento sem criar duplicidade.</p>
         </div>
         <div class="panel insight">
-          <h2>Como usar</h2>
-          <p class="muted">Preencha o que espera receber e pagar no mes. Depois que os extratos forem importados e classificados, compare o saldo realizado com o saldo orcado.</p>
+          <h2>Leitura gerencial</h2>
+          <p class="muted">Use o realizado para entender o que aconteceu e o planejado para enxergar o que deveria acontecer. A diferenca mostra se o caixa ficou acima ou abaixo do orcado.</p>
         </div>
       </div>
       <div class="panel">

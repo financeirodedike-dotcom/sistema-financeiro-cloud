@@ -868,7 +868,6 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         "classificacao",
         "compras",
         "fluxo",
-        "caixa-planejado",
         "conciliacao",
         "dre",
         "balanco",
@@ -885,6 +884,8 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         "acessos",
     }
     active_tab = request.query_params.get("tab", "dashboard")
+    if active_tab == "caixa-planejado":
+        active_tab = "fluxo"
     if active_tab not in valid_tabs:
         active_tab = "dashboard"
 
@@ -893,7 +894,6 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         "financeiro",
         "compras",
         "fluxo",
-        "caixa-planejado",
         "conciliacao",
         "dre",
         "balanco",
@@ -1135,7 +1135,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     )
     planned_cashflow_report = (
         planned_cashflow(db, company.id, cashflow_report)
-        if active_tab in {"dashboard", "caixa-planejado"}
+        if active_tab in {"dashboard", "fluxo"}
         else empty_planned_cashflow()
     )
     bank_reconciliation = (
@@ -1842,7 +1842,7 @@ def save_cashflow_plan(
     _user, company = context
     clean_month = month[:7]
     if len(clean_month) != 7:
-        return RedirectResponse("/?tab=caixa-planejado", status_code=303)
+        return RedirectResponse("/?tab=fluxo", status_code=303)
     plan = db.scalar(select(CashflowPlan).where(CashflowPlan.company_id == company.id, CashflowPlan.month == clean_month))
     if plan:
         plan.planned_inflows = planned_inflows
@@ -1860,7 +1860,7 @@ def save_cashflow_plan(
             )
         )
     db.commit()
-    return RedirectResponse("/?tab=caixa-planejado", status_code=303)
+    return RedirectResponse("/?tab=fluxo", status_code=303)
 
 
 @app.post("/bank-reconciliations")
