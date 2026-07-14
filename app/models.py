@@ -59,6 +59,7 @@ class FinancialAccount(Base):
 
     company: Mapped[Company] = relationship(back_populates="accounts")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account")
+    transaction_splits: Mapped[list["TransactionSplit"]] = relationship(back_populates="account")
 
 
 class ClassificationRule(Base):
@@ -116,6 +117,24 @@ class Transaction(Base):
     company: Mapped[Company] = relationship()
     import_batch: Mapped[ImportBatch | None] = relationship()
     account: Mapped[FinancialAccount | None] = relationship(back_populates="transactions")
+    splits: Mapped[list["TransactionSplit"]] = relationship(back_populates="transaction", cascade="all, delete-orphan")
+
+
+class TransactionSplit(Base):
+    __tablename__ = "transaction_splits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    transaction_id: Mapped[int] = mapped_column(ForeignKey("transactions.id"), index=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("financial_accounts.id"), index=True)
+    entrada: Mapped[float] = mapped_column(Float, default=0)
+    saida: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    transaction: Mapped[Transaction] = relationship(back_populates="splits")
+    account: Mapped[FinancialAccount] = relationship(back_populates="transaction_splits")
 
 
 class BalanceAdjustment(Base):

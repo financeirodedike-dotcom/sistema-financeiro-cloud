@@ -8,11 +8,42 @@ from sqlalchemy.orm import Session
 from app.models import BankReconciliation, CashflowPlan, Debt, FinancialAccount, Transaction
 
 
+def transaction_is_accounted(row: Transaction) -> bool:
+    if row.splits:
+        return any(split.account and split.account.name.upper() != "A CLASSIFICAR" for split in row.splits)
+    return bool(row.account and row.account.name.upper() != "A CLASSIFICAR")
+
+
+def classified_entries(rows: list[Transaction]) -> list[dict]:
+    entries = []
+    for row in rows:
+        if row.splits:
+            for split in row.splits:
+                entries.append(
+                    {
+                        "transaction": row,
+                        "account": split.account,
+                        "entrada": split.entrada,
+                        "saida": split.saida,
+                    }
+                )
+        else:
+            entries.append(
+                {
+                    "transaction": row,
+                    "account": row.account,
+                    "entrada": row.entrada,
+                    "saida": row.saida,
+                }
+            )
+    return entries
+
+
 def dashboard(db: Session, company_id: int) -> dict:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     receitas = sum(row.entrada for row in rows)
     despesas = sum(row.saida for row in rows)
-    pendentes = sum(1 for row in rows if not row.account or row.account.name.upper() == "A CLASSIFICAR")
+    pendentes = sum(1 for row in rows if not transaction_is_accounted(row))
     return {
         "receitas": receitas,
         "despesas": despesas,
@@ -62,6 +93,7 @@ def monthly_cashflow(db: Session, company_id: int) -> list[dict]:
 
 def cashflow_diagnostics(db: Session, company_id: int) -> dict:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
+    entries = classified_entries(rows)
     by_month = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
     by_bank = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
     by_account = defaultdict(lambda: {"entradas": 0, "saidas": 0, "saldo": 0})
@@ -71,21 +103,25 @@ def cashflow_diagnostics(db: Session, company_id: int) -> dict:
         month = row.date.strftime("%Y-%m")
         movement = row.entrada - row.saida
         bank = row.bank or "Sem banco/caixa"
-        account_name = row.account.name if row.account else "A CLASSIFICAR"
         by_month[month]["entradas"] += row.entrada
         by_month[month]["saidas"] += row.saida
         by_month[month]["saldo"] += movement
         by_bank[bank]["entradas"] += row.entrada
         by_bank[bank]["saidas"] += row.saida
         by_bank[bank]["saldo"] += movement
-        by_account[account_name]["entradas"] += row.entrada
-        by_account[account_name]["saidas"] += row.saida
-        by_account[account_name]["saldo"] += movement
-        if row.saida > 0:
-            group = row.account.group_name if row.account else "A CLASSIFICAR"
-            by_group[group] += row.saida
+    for entry in entries:
+        account = entry["account"]
+        account_name = account.name if account else "A CLASSIFICAR"
+        entrada = entry["entrada"]
+        saida = entry["saida"]
+        by_account[account_name]["entradas"] += entrada
+        by_account[account_name]["saidas"] += saida
+        by_account[account_name]["saldo"] += entrada - saida
+        if saida > 0:
+            group = account.group_name if account else "A CLASSIFICAR"
+            by_group[group] += saida
             if group == "A CLASSIFICAR":
-                unclassified_outflows += row.saida
+                unclassified_outflows += saida
 
     month_rows = [
         {"month": month, **values}
@@ -204,9 +240,10 @@ def bank_reconciliation_report(db: Session, company_id: int) -> dict:
 def dre(db: Session, company_id: int) -> list[dict]:
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     lines = defaultdict(float)
-    for row in rows:
-        line = row.account.dre_line if row.account else "Outras Receitas/Despesas"
-        lines[line] += row.entrada - row.saida
+    for entry in classified_entries(rows):
+        account = entry["account"]
+        line = account.dre_line if account else "Outras Receitas/Despesas"
+        lines[line] += entry["entrada"] - entry["saida"]
 
     receita_bruta = lines["Receita Bruta"]
     outras_receitas = lines["Outras Receitas"]
@@ -254,15 +291,14 @@ def dre(db: Session, company_id: int) -> list[dict]:
 
 
 def purchases(db: Session, company_id: int) -> dict:
-    rows = db.scalars(
-        select(Transaction)
-        .join(FinancialAccount)
-        .where(Transaction.company_id == company_id, FinancialAccount.group_name == "Custos e Compras")
-        .order_by(Transaction.date.desc())
-        .limit(100)
-    ).all()
-    total = sum(row.saida for row in rows)
-    return {"rows": rows, "total": total, "count": len(rows)}
+    rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id).order_by(Transaction.date.desc())).all()
+    purchase_entries = [
+        entry
+        for entry in classified_entries(rows)
+        if entry["account"] and entry["account"].group_name == "Custos e Compras" and entry["saida"] > 0
+    ][:100]
+    total = sum(entry["saida"] for entry in purchase_entries)
+    return {"rows": purchase_entries, "total": total, "count": len(purchase_entries)}
 
 
 def balance_sheet(db: Session, company_id: int) -> dict:
@@ -294,11 +330,12 @@ def dashboard_charts(db: Session, company_id: int) -> dict:
 
     rows = db.scalars(select(Transaction).where(Transaction.company_id == company_id)).all()
     by_group = defaultdict(float)
-    for row in rows:
-        if row.saida <= 0:
+    for entry in classified_entries(rows):
+        if entry["saida"] <= 0:
             continue
-        group = row.account.group_name if row.account else "A CLASSIFICAR"
-        by_group[group] += row.saida
+        account = entry["account"]
+        group = account.group_name if account else "A CLASSIFICAR"
+        by_group[group] += entry["saida"]
     max_group = max(list(by_group.values()) + [1])
     expense_groups = [
         {"group": group, "value": value, "pct": round((value / max_group) * 100, 2)}

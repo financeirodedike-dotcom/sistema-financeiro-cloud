@@ -7,14 +7,14 @@ from xml.etree import ElementTree
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, User
+from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -168,6 +168,39 @@ def parse_filter_date(value: str | None) -> date | None:
         except ValueError:
             continue
     return None
+
+
+def is_transaction_accounted(row: Transaction) -> bool:
+    if row.splits:
+        return any(split.account and split.account.name.upper() != "A CLASSIFICAR" for split in row.splits)
+    return bool(row.account and row.account.name.upper() != "A CLASSIFICAR")
+
+
+def transaction_direction_values(row: Transaction, value: float | None = None) -> tuple[float, float]:
+    amount = abs(float(value if value is not None else (row.entrada or row.saida or row.amount or 0)))
+    if row.entrada > 0 or row.amount > 0:
+        return amount, 0
+    return 0, amount
+
+
+def reset_transaction_splits(db: Session, row: Transaction) -> None:
+    db.execute(delete(TransactionSplit).where(TransactionSplit.transaction_id == row.id))
+
+
+def create_full_transaction_split(db: Session, company: Company, row: Transaction, account: FinancialAccount) -> None:
+    reset_transaction_splits(db, row)
+    entrada, saida = transaction_direction_values(row)
+    db.add(
+        TransactionSplit(
+            company_id=company.id,
+            transaction_id=row.id,
+            account_id=account.id,
+            entrada=entrada,
+            saida=saida,
+            notes="Classificacao simples",
+        )
+    )
+    row.account_id = account.id
 
 
 def update_reconciliation_from_ofx(
@@ -497,9 +530,11 @@ def home(request: Request, db: Session = Depends(get_db)):
     else:
         sort_order = "desc"
         transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
-    transactions = db.scalars(transaction_query.limit(500)).all()
-    classified_count = sum(1 for row in transactions if row.account and row.account.name.upper() != "A CLASSIFICAR")
-    pending_count = len(transactions) - classified_count
+    transaction_rows = db.scalars(transaction_query.limit(2000)).all()
+    accounted_transactions = [row for row in transaction_rows if is_transaction_accounted(row)]
+    transactions = [row for row in transaction_rows if not is_transaction_accounted(row)]
+    classified_count = len(accounted_transactions)
+    pending_count = len(transactions)
     bank_options = db.scalars(
         select(Transaction.bank)
         .where(Transaction.company_id == company.id, Transaction.bank != "")
@@ -599,6 +634,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "accounts": accounts,
             "rules": rules,
             "transactions": transactions,
+            "accounted_transactions": accounted_transactions[:500],
             "classified_count": classified_count,
             "pending_count": pending_count,
             "imports": imports,
@@ -1353,7 +1389,7 @@ def bulk_classify_transactions(
             select(Transaction).where(Transaction.company_id == company.id, Transaction.id.in_(transaction_ids))
         ).all()
         for row in rows:
-            row.account_id = account.id
+            create_full_transaction_split(db, company, row, account)
         db.commit()
     return RedirectResponse("/?tab=extratos", status_code=303)
 
@@ -1485,6 +1521,60 @@ def classify_transaction(
         select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
     )
     if row and account:
-        row.account_id = account.id
+        create_full_transaction_split(db, company, row, account)
+        db.commit()
+    return RedirectResponse("/?tab=extratos", status_code=303)
+
+
+@app.post("/transactions/{transaction_id}/split")
+def split_transaction(
+    request: Request,
+    transaction_id: int,
+    split_account_id: list[int] = Form([]),
+    split_value: list[str] = Form([]),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    row = db.scalar(select(Transaction).where(Transaction.company_id == company.id, Transaction.id == transaction_id))
+    if not row:
+        return RedirectResponse("/?tab=extratos", status_code=303)
+
+    valid_splits: list[tuple[FinancialAccount, float]] = []
+    for account_id, value in zip(split_account_id, split_value):
+        try:
+            amount = float((value or "0").replace(",", "."))
+        except ValueError:
+            amount = 0
+        if amount <= 0:
+            continue
+        account = db.scalar(
+            select(FinancialAccount).where(FinancialAccount.company_id == company.id, FinancialAccount.id == account_id)
+        )
+        if account:
+            valid_splits.append((account, amount))
+
+    if valid_splits:
+        reset_transaction_splits(db, row)
+        row.account_id = valid_splits[0][0].id
+        target_total = abs(row.entrada or row.saida or row.amount or 0)
+        split_total = sum(value for _account, value in valid_splits)
+        difference = target_total - split_total
+        for account, amount in valid_splits:
+            entrada, saida = transaction_direction_values(row, amount)
+            db.add(
+                TransactionSplit(
+                    company_id=company.id,
+                    transaction_id=row.id,
+                    account_id=account.id,
+                    entrada=entrada,
+                    saida=saida,
+                    notes="Rateio manual",
+                )
+            )
+        if abs(difference) > 0.01:
+            row.notes = f"{row.notes}\nRateio com diferenca de {format_brl(difference)}.".strip()
         db.commit()
     return RedirectResponse("/?tab=extratos", status_code=303)

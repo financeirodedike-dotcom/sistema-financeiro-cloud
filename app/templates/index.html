@@ -109,6 +109,7 @@
     #tab-financeiro:checked ~ .tabs label[for="tab-financeiro"],
     #tab-cadastros:checked ~ .tabs label[for="tab-cadastros"],
     #tab-extratos:checked ~ .tabs label[for="tab-extratos"],
+    #tab-contabilizados:checked ~ .tabs label[for="tab-contabilizados"],
     #tab-classificacao:checked ~ .tabs label[for="tab-classificacao"],
     #tab-compras:checked ~ .tabs label[for="tab-compras"],
     #tab-fluxo:checked ~ .tabs label[for="tab-fluxo"],
@@ -136,6 +137,7 @@
     #tab-financeiro:checked ~ main #financeiro,
     #tab-cadastros:checked ~ main #cadastros,
     #tab-extratos:checked ~ main #extratos,
+    #tab-contabilizados:checked ~ main #contabilizados,
     #tab-classificacao:checked ~ main #classificacao,
     #tab-compras:checked ~ main #compras,
     #tab-fluxo:checked ~ main #fluxo,
@@ -282,6 +284,9 @@
     .debt-edit { margin-top: 8px; }
     .debt-edit summary { display: inline-block; padding: 7px 10px; border-radius: 6px; background: var(--blue); color: white; font-weight: 700; cursor: pointer; }
     .debt-edit form { margin-top: 8px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+    .split-box { margin-top: 8px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); min-width: 360px; }
+    .split-line { display: grid; grid-template-columns: minmax(180px, 1fr) 120px; gap: 8px; width: 100%; }
+    .split-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .role-badge { display: inline-block; border-radius: 999px; padding: 5px 9px; background: #e8f3ff; color: #12355b; font-weight: 700; font-size: 12px; }
     .danger { background: #c1121f; }
     .inline-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #667085; }
@@ -324,6 +329,7 @@
   <input id="tab-financeiro" name="tab" type="radio" {% if active_tab == "financeiro" %}checked{% endif %}>
   <input id="tab-cadastros" name="tab" type="radio" {% if active_tab == "cadastros" %}checked{% endif %}>
   <input id="tab-extratos" name="tab" type="radio" {% if active_tab == "extratos" %}checked{% endif %}>
+  <input id="tab-contabilizados" name="tab" type="radio" {% if active_tab == "contabilizados" %}checked{% endif %}>
   <input id="tab-classificacao" name="tab" type="radio" {% if active_tab == "classificacao" %}checked{% endif %}>
   <input id="tab-compras" name="tab" type="radio" {% if active_tab == "compras" %}checked{% endif %}>
   <input id="tab-fluxo" name="tab" type="radio" {% if active_tab == "fluxo" %}checked{% endif %}>
@@ -717,21 +723,26 @@
         <h2>Areas do financeiro</h2>
         <div class="finance-tabs">
           <a class="finance-tab" href="/?tab=extratos"><span>01</span> Extratos</a>
-          <a class="finance-tab" href="/?tab=classificacao"><span>02</span> Classificacao</a>
-          <a class="finance-tab" href="/?tab=fluxo"><span>03</span> Fluxo de Caixa</a>
-          <a class="finance-tab" href="/?tab=dre"><span>04</span> DRE</a>
-          <a class="finance-tab" href="/?tab=endividamento"><span>05</span> Endividamento</a>
-          <a class="finance-tab" href="/?tab=contas-pagar"><span>06</span> Contas a Pagar</a>
-          <a class="finance-tab" href="/?tab=contas-receber"><span>07</span> Contas a Receber</a>
-          <a class="finance-tab" href="/?tab=antecipacoes"><span>08</span> Antecipacoes</a>
-          <a class="finance-tab" href="/?tab=caixa-planejado"><span>09</span> Caixa Planejado</a>
-          <a class="finance-tab" href="/?tab=conciliacao"><span>10</span> Conciliacao</a>
+          <a class="finance-tab" href="/?tab=contabilizados"><span>02</span> Contabilizados</a>
+          <a class="finance-tab" href="/?tab=classificacao"><span>03</span> Classificacao</a>
+          <a class="finance-tab" href="/?tab=fluxo"><span>04</span> Fluxo de Caixa</a>
+          <a class="finance-tab" href="/?tab=dre"><span>05</span> DRE</a>
+          <a class="finance-tab" href="/?tab=endividamento"><span>06</span> Endividamento</a>
+          <a class="finance-tab" href="/?tab=contas-pagar"><span>07</span> Contas a Pagar</a>
+          <a class="finance-tab" href="/?tab=contas-receber"><span>08</span> Contas a Receber</a>
+          <a class="finance-tab" href="/?tab=antecipacoes"><span>09</span> Antecipacoes</a>
+          <a class="finance-tab" href="/?tab=caixa-planejado"><span>10</span> Caixa Planejado</a>
+          <a class="finance-tab" href="/?tab=conciliacao"><span>11</span> Conciliacao</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
           <a class="module-card" href="/?tab=extratos">
             <strong>Extratos</strong>
             <span>Importe OFX, filtre por data, escolha banco/caixa e consulte o banco de dados de lancamentos.</span>
+          </a>
+          <a class="module-card" href="/?tab=contabilizados">
+            <strong>Contabilizados</strong>
+            <span>Veja tudo que ja foi classificado, incluindo lancamentos rateados em mais de uma conta financeira.</span>
           </a>
           <a class="module-card" href="/?tab=classificacao">
             <strong>Classificacao</strong>
@@ -893,7 +904,8 @@
         <p class="muted">Depois de salvar, a nova conta ja aparece na lista de classificacao dos lancamentos.</p>
       </div>
       <div class="panel">
-        <h2>Banco de dados de lancamentos</h2>
+        <h2>Extratos a contabilizar</h2>
+        <p class="muted">Aqui ficam apenas os lancamentos ainda pendentes. Depois de classificar ou ratear, eles saem desta tela e aparecem em Financeiro > Contabilizados.</p>
         <form id="bulk-classify-form" action="/transactions/bulk-classify" method="post">
           <select name="account_id" required>
             <option value="">Conta para contabilizar selecionados</option>
@@ -905,22 +917,16 @@
         </form>
         <div class="scroll">
           <table>
-            <thead><tr><th>Sel.</th><th>Data</th><th>Historico</th><th>Banco</th><th>Conta Financeira</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar</th></tr></thead>
+            <thead><tr><th>Sel.</th><th>Data</th><th>Historico</th><th>Banco</th><th>Status</th><th>Entrada</th><th>Saida</th><th>Classificar / Ratear</th></tr></thead>
             <tbody>
               {% for row in transactions %}
-              {% set is_classified = row.account and row.account.name.upper() != "A CLASSIFICAR" %}
-              <tr class="{{ 'classified-row' if is_classified else 'pending-row' }}">
+              <tr class="pending-row">
                 <td><input form="bulk-classify-form" type="checkbox" name="transaction_ids" value="{{ row.id }}"></td>
                 <td>{{ row.date|date_br }}</td>
                 <td>{{ row.history }}</td>
                 <td>{{ row.bank }}</td>
-                <td>{{ row.account.name if row.account else "A CLASSIFICAR" }}</td>
                 <td>
-                  {% if is_classified %}
-                  <span class="pill status-ok">Lancado / classificado</span>
-                  {% else %}
                   <span class="pill status-pending">Pendente</span>
-                  {% endif %}
                 </td>
                 <td>{{ row.entrada|brl }}</td>
                 <td>{{ row.saida|brl }}</td>
@@ -933,8 +939,75 @@
                     </select>
                     <button type="submit">OK</button>
                   </form>
+                  <details>
+                    <summary class="pill">Ratear em varias contas</summary>
+                    <form class="split-box" action="/transactions/{{ row.id }}/split" method="post">
+                      <p class="muted">Valor do lancamento: {{ (row.entrada if row.entrada > 0 else row.saida)|brl }}. Preencha os valores por conta.</p>
+                      {% for item in [1, 2, 3] %}
+                      <div class="split-line">
+                        <select name="split_account_id">
+                          {% for account in accounts %}
+                          <option value="{{ account.id }}">{{ account.name }}</option>
+                          {% endfor %}
+                        </select>
+                        <input name="split_value" type="number" step="0.01" min="0" placeholder="Valor">
+                      </div>
+                      {% endfor %}
+                      <button type="submit">Salvar rateio</button>
+                    </form>
+                  </details>
                 </td>
               </tr>
+              {% else %}
+              <tr><td colspan="8">Nenhum lancamento pendente nos filtros atuais.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="contabilizados" class="tab">
+      <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      <div class="panel hero360">
+        <h2>Contabilizados</h2>
+        <p>Arquivo dos lancamentos ja classificados. Quando houver rateio, o sistema mostra cada conta financeira usada naquele lancamento.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Total contabilizado</strong><span>{{ classified_count }} lancamentos</span></div>
+          <div class="pillar"><strong>Pendentes</strong><span>{{ pending_count }} em extratos</span></div>
+          <div class="pillar"><strong>Receitas</strong><span>{{ dashboard.receitas|brl }}</span></div>
+          <div class="pillar"><strong>Despesas</strong><span>{{ dashboard.despesas|brl }}</span></div>
+          <div class="pillar"><strong>Resultado</strong><span>{{ dashboard.resultado|brl }}</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Lancamentos contabilizados</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta(s) financeira(s)</th><th>Entrada</th><th>Saida</th><th>Observacoes</th></tr></thead>
+            <tbody>
+              {% for row in accounted_transactions %}
+              <tr class="classified-row">
+                <td>{{ row.date|date_br }}</td>
+                <td>{{ row.history }}</td>
+                <td>{{ row.bank }}</td>
+                <td>
+                  <div class="split-list">
+                    {% if row.splits %}
+                      {% for split in row.splits %}
+                      <span class="pill">{{ split.account.name }}: {{ (split.entrada if split.entrada > 0 else split.saida)|brl }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="pill">{{ row.account.name if row.account else "A CLASSIFICAR" }}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>{{ row.entrada|brl }}</td>
+                <td>{{ row.saida|brl }}</td>
+                <td>{{ row.notes }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7">Nenhum lancamento contabilizado nos filtros atuais.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -1021,7 +1094,7 @@
           <thead><tr><th>Data</th><th>Historico</th><th>Conta</th><th>Valor</th></tr></thead>
           <tbody>
             {% for row in purchases.rows %}
-            <tr><td>{{ row.date|date_br }}</td><td>{{ row.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>{{ row.saida|brl }}</td></tr>
+            <tr><td>{{ row.transaction.date|date_br }}</td><td>{{ row.transaction.history }}</td><td>{{ row.account.name if row.account else "" }}</td><td>{{ row.saida|brl }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
