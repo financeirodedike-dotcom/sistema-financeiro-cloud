@@ -200,6 +200,36 @@
     tfoot td { background: var(--soft-2); font-weight: 900; }
     tr:nth-child(even) td { background: var(--surface-muted); }
     tbody tr:hover td { background: #eef8fb; }
+    .cashflow-matrix-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+    .cashflow-matrix { min-width: 1180px; border-spacing: 0; }
+    .cashflow-matrix th:first-child,
+    .cashflow-matrix td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      min-width: 230px;
+      box-shadow: 8px 0 14px rgba(15,35,55,.05);
+    }
+    .cashflow-matrix th:first-child { z-index: 3; }
+    .cashflow-matrix td { text-align: right; white-space: nowrap; }
+    .cashflow-matrix .row-label { text-align: left; font-weight: 800; color: var(--blue); background: #f8fbff; }
+    .cashflow-matrix .section-row td {
+      background: #071f35;
+      color: white;
+      font-weight: 900;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-top: 3px solid #0d9488;
+      border-bottom: 0;
+    }
+    .cashflow-matrix .kind-entrada td:not(.row-label) { color: var(--green); }
+    .cashflow-matrix .kind-saida td:not(.row-label) { color: var(--red); }
+    .cashflow-matrix .kind-planejado td:not(.row-label) { background: #fff7dc; }
+    .cashflow-matrix .kind-saldo td:not(.row-label),
+    .cashflow-matrix .kind-resultado td:not(.row-label),
+    .cashflow-matrix .kind-variacao td:not(.row-label) { font-weight: 900; }
+    .cashflow-matrix .total-col { background: #e8f1f8; font-weight: 900; }
     tr.classified-row { background: #ecfdf3; }
     tr.pending-row { background: #fff8e6; }
     tr.classified-row td { background: #ecfdf3; }
@@ -1412,32 +1442,39 @@
           <p class="money-formula">Saldo inicial {{ cashflow_totals.saldo_inicial|brl }} + Entradas {{ cashflow_totals.entradas|brl }} - Saidas {{ cashflow_totals.saidas|brl }} = Saldo final {{ cashflow_totals.saldo_final|brl }}</p>
           <p class="muted">{{ cashflow_explanation }} Essa diferenca e o saldo do periodo. Quando houver saldo inicial vindo da conciliacao/OFX, ele entra na conta do saldo final.</p>
         </div>
-        <p class="muted">Valores em padrao financeiro brasileiro: R$ 1.234,56.</p>
-        <table>
-          <thead><tr><th>Mes</th><th>Saldo inicial</th><th>Entradas</th><th>Saidas</th><th>Saldo mes</th><th>Saldo final</th></tr></thead>
-          <tbody>
-            {% for row in cashflow %}
-            <tr>
-              <td>{{ row.month|month_br }}</td>
-              <td class="{{ 'negative' if row.saldo_inicial < 0 else 'positive' }}">{{ row.saldo_inicial|brl }}{% if row.saldo_inicial_informado %} <span class="pill">OFX</span>{% endif %}</td>
-              <td>{{ row.entradas|brl }}</td>
-              <td>{{ row.saidas|brl }}</td>
-              <td class="{{ 'negative' if row.saldo_mes < 0 else 'positive' }}">{{ row.saldo_mes|brl }}</td>
-              <td class="{{ 'negative' if row.saldo_final < 0 else 'positive' }}">{{ row.saldo_final|brl }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total do periodo</td>
-              <td>{{ cashflow_totals.saldo_inicial|brl }}</td>
-              <td>{{ cashflow_totals.entradas|brl }}</td>
-              <td>{{ cashflow_totals.saidas|brl }}</td>
-              <td class="{{ 'negative' if cashflow_totals.saldo_periodo < 0 else 'positive' }}">{{ cashflow_totals.saldo_periodo|brl }}</td>
-              <td class="{{ 'negative' if cashflow_totals.saldo_final < 0 else 'positive' }}">{{ cashflow_totals.saldo_final|brl }}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <p class="muted">Modelo em matriz inspirado na aba Total da planilha: blocos nas linhas, meses nas colunas e total do periodo na ultima coluna.</p>
+        <div class="cashflow-matrix-wrap">
+          <table class="cashflow-matrix">
+            <thead>
+              <tr>
+                <th>Fluxo de caixa</th>
+                {% for month in cashflow_matrix.months %}
+                <th>{{ month|month_br }}</th>
+                {% endfor %}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in cashflow_matrix.rows %}
+              {% if row.type == "section" %}
+              <tr class="section-row">
+                <td>{{ row.label }}</td>
+                {% for cell in row.cells %}<td></td>{% endfor %}
+                <td></td>
+              </tr>
+              {% else %}
+              <tr class="kind-{{ row.kind }}">
+                <td class="row-label">{{ row.label }}</td>
+                {% for value in row.cells %}
+                <td class="{{ 'negative' if value < 0 else 'positive' if value > 0 else '' }}">{{ value|brl }}</td>
+                {% endfor %}
+                <td class="total-col {{ 'negative' if row.total < 0 else 'positive' if row.total > 0 else '' }}">{{ row.total|brl }}</td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div class="panel hero360">
         <h2>Planejado e Orcado</h2>

@@ -16,7 +16,7 @@ from app.classifier import classify_account
 from app.database import get_db, init_db
 from app.models import Anticipation, AnticipationAttachment, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_balances
-from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
+from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
 app = FastAPI(title="Business360 AI")
@@ -414,6 +414,10 @@ def empty_planned_cashflow() -> dict:
             "variance": 0,
         },
     }
+
+
+def empty_cashflow_matrix() -> dict:
+    return {"months": [], "rows": []}
 
 
 def empty_bank_reconciliation() -> dict:
@@ -842,6 +846,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "cashflow_diagnostics": cashflow_diagnostics(db, company.id, report_transactions),
             "cashflow_explanation": cashflow_explanation,
             "planned_cashflow": planned_cashflow(db, company.id, cashflow_report),
+            "cashflow_matrix": cashflow_matrix(cashflow_report, planned_cashflow(db, company.id, cashflow_report)),
             "bank_reconciliation": bank_reconciliation_report(db, company.id, report_transactions),
             "dre": dre(db, company.id, report_transactions),
             "balance": balance_sheet(db, company.id, report_transactions),
@@ -1138,6 +1143,11 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         if active_tab in {"dashboard", "fluxo"}
         else empty_planned_cashflow()
     )
+    cashflow_matrix_report = (
+        cashflow_matrix(cashflow_report, planned_cashflow_report)
+        if active_tab == "fluxo"
+        else empty_cashflow_matrix()
+    )
     bank_reconciliation = (
         bank_reconciliation_report(db, company.id, report_transactions)
         if active_tab == "conciliacao"
@@ -1216,6 +1226,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             "cashflow_diagnostics": cashflow_diagnostics_report,
             "cashflow_explanation": cashflow_explanation,
             "planned_cashflow": planned_cashflow_report,
+            "cashflow_matrix": cashflow_matrix_report,
             "bank_reconciliation": bank_reconciliation,
             "dre": dre_report,
             "balance": balance_report,

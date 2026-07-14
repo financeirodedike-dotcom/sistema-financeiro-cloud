@@ -204,6 +204,44 @@ def planned_cashflow(db: Session, company_id: int, actual_rows: list[dict] | Non
     return {"rows": rows, "totals": totals}
 
 
+def cashflow_matrix(actual_rows: list[dict], planned_report: dict) -> dict:
+    actual_by_month = {row["month"]: row for row in actual_rows}
+    planned_by_month = {row["month"]: row for row in planned_report.get("rows", [])}
+    months = sorted(set(actual_by_month) | set(planned_by_month))
+
+    def actual_value(month: str, field: str) -> float:
+        return actual_by_month.get(month, {}).get(field, 0) or 0
+
+    def planned_value(month: str, field: str) -> float:
+        return planned_by_month.get(month, {}).get(field, 0) or 0
+
+    row_specs = [
+        ("SALDO INICIAL", "Saldo inicial realizado", "saldo", lambda month: actual_value(month, "saldo_inicial")),
+        ("ENTRADAS", "Entradas realizadas", "entrada", lambda month: actual_value(month, "entradas")),
+        ("ENTRADAS", "Entradas planejadas", "planejado", lambda month: planned_value(month, "planned_inflows")),
+        ("ENTRADAS", "Diferença das entradas", "variacao", lambda month: actual_value(month, "entradas") - planned_value(month, "planned_inflows")),
+        ("SAÍDAS", "Saídas realizadas", "saida", lambda month: actual_value(month, "saidas")),
+        ("SAÍDAS", "Saídas planejadas", "planejado", lambda month: planned_value(month, "planned_outflows")),
+        ("SAÍDAS", "Diferença das saídas", "variacao", lambda month: planned_value(month, "planned_outflows") - actual_value(month, "saidas")),
+        ("RESULTADO", "Saldo do mês realizado", "resultado", lambda month: actual_value(month, "saldo_mes")),
+        ("RESULTADO", "Saldo do mês planejado", "planejado", lambda month: planned_value(month, "planned_balance")),
+        ("RESULTADO", "Variação realizado x planejado", "variacao", lambda month: planned_value(month, "variance")),
+        ("SALDO FINAL", "Saldo final realizado", "saldo", lambda month: actual_value(month, "saldo_final")),
+    ]
+
+    rows = []
+    current_section = None
+    for section, label, kind, getter in row_specs:
+        if section != current_section:
+            rows.append({"type": "section", "label": section, "cells": ["" for _month in months], "total": ""})
+            current_section = section
+        values = [getter(month) for month in months]
+        total = values[-1] if kind == "saldo" and values else sum(values)
+        rows.append({"type": "value", "label": label, "kind": kind, "cells": values, "total": total})
+
+    return {"months": months, "rows": rows}
+
+
 def bank_reconciliation_report(db: Session, company_id: int, transactions: list[Transaction] | None = None) -> dict:
     transactions = transactions if transactions is not None else load_transactions(db, company_id)
     reconciliations = db.scalars(
