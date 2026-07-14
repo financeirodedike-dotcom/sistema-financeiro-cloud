@@ -204,10 +204,50 @@ def planned_cashflow(db: Session, company_id: int, actual_rows: list[dict] | Non
     return {"rows": rows, "totals": totals}
 
 
-def cashflow_matrix(actual_rows: list[dict], planned_report: dict) -> dict:
+def cashflow_matrix(actual_rows: list[dict], planned_report: dict, transactions: list[Transaction] | None = None) -> dict:
     actual_by_month = {row["month"]: row for row in actual_rows}
     planned_by_month = {row["month"]: row for row in planned_report.get("rows", [])}
-    months = sorted(set(actual_by_month) | set(planned_by_month))
+    entries = classified_entries(transactions or [])
+    account_month_values = defaultdict(lambda: defaultdict(lambda: {"projected": None, "realized": 0}))
+    section_account_totals = defaultdict(lambda: defaultdict(float))
+
+    def section_for_entry(entry: dict) -> tuple[str, str]:
+        account = entry["account"]
+        group = account.group_name if account else "A CLASSIFICAR"
+        if entry["entrada"] > 0:
+            return "RECEITAS", "entrada"
+        if group == "Custos e Compras":
+            return "CUSTOS (Compras)", "saida"
+        if group == "Pessoal":
+            return "DESPESAS COM PESSOAL", "saida"
+        if group == "Impostos":
+            return "IMPOSTOS", "saida"
+        if group == "Financeiro":
+            return "FINANCEIRO", "saida"
+        if group == "Transferências":
+            return "TRANSFERÊNCIAS", "transferencia"
+        if group.startswith("Despesas"):
+            return "DESPESAS (pagamentos)", "saida"
+        return group.upper(), "saida"
+
+    section_kinds = {}
+    for entry in entries:
+        account = entry["account"]
+        account_name = account.name if account else "A CLASSIFICAR"
+        month = entry["transaction"].date.strftime("%Y-%m")
+        section, kind = section_for_entry(entry)
+        value = entry["entrada"] if entry["entrada"] > 0 else entry["saida"]
+        if kind == "transferencia":
+            value = entry["entrada"] - entry["saida"]
+        account_month_values[(section, account_name)][month]["realized"] += value
+        section_account_totals[section][account_name] += value
+        section_kinds[section] = kind
+
+    months = sorted(
+        set(actual_by_month)
+        | set(planned_by_month)
+        | {month for month_values in account_month_values.values() for month in month_values}
+    )
 
     def actual_value(month: str, field: str) -> float:
         return actual_by_month.get(month, {}).get(field, 0) or 0
@@ -215,29 +255,63 @@ def cashflow_matrix(actual_rows: list[dict], planned_report: dict) -> dict:
     def planned_value(month: str, field: str) -> float:
         return planned_by_month.get(month, {}).get(field, 0) or 0
 
-    row_specs = [
-        ("SALDO INICIAL", "Saldo inicial realizado", "saldo", lambda month: actual_value(month, "saldo_inicial")),
-        ("ENTRADAS", "Entradas realizadas", "entrada", lambda month: actual_value(month, "entradas")),
-        ("ENTRADAS", "Entradas planejadas", "planejado", lambda month: planned_value(month, "planned_inflows")),
-        ("ENTRADAS", "Diferença das entradas", "variacao", lambda month: actual_value(month, "entradas") - planned_value(month, "planned_inflows")),
-        ("SAÍDAS", "Saídas realizadas", "saida", lambda month: actual_value(month, "saidas")),
-        ("SAÍDAS", "Saídas planejadas", "planejado", lambda month: planned_value(month, "planned_outflows")),
-        ("SAÍDAS", "Diferença das saídas", "variacao", lambda month: planned_value(month, "planned_outflows") - actual_value(month, "saidas")),
-        ("RESULTADO", "Saldo do mês realizado", "resultado", lambda month: actual_value(month, "saldo_mes")),
-        ("RESULTADO", "Saldo do mês planejado", "planejado", lambda month: planned_value(month, "planned_balance")),
-        ("RESULTADO", "Variação realizado x planejado", "variacao", lambda month: planned_value(month, "variance")),
-        ("SALDO FINAL", "Saldo final realizado", "saldo", lambda month: actual_value(month, "saldo_final")),
-    ]
-
     rows = []
-    current_section = None
-    for section, label, kind, getter in row_specs:
-        if section != current_section:
-            rows.append({"type": "section", "label": section, "cells": ["" for _month in months], "total": ""})
-            current_section = section
-        values = [getter(month) for month in months]
-        total = values[-1] if kind == "saldo" and values else sum(values)
-        rows.append({"type": "value", "label": label, "kind": kind, "cells": values, "total": total})
+
+    def build_cells(projected_getter, realized_getter) -> list[dict]:
+        cells = []
+        for month in months:
+            projected = projected_getter(month)
+            realized = realized_getter(month)
+            variance = None if projected is None else realized - projected
+            cells.append({"projected": projected, "realized": realized, "variance": variance})
+        return cells
+
+    def row_total(cells: list[dict], kind: str) -> dict:
+        if kind == "saldo" and cells:
+            return {"projected": cells[-1]["projected"], "realized": cells[-1]["realized"]}
+        projected_values = [cell["projected"] for cell in cells if cell["projected"] is not None]
+        return {
+            "projected": sum(projected_values) if projected_values else None,
+            "realized": sum(cell["realized"] or 0 for cell in cells),
+        }
+
+    def add_value_row(label: str, kind: str, projected_getter, realized_getter, row_type: str = "value") -> None:
+        cells = build_cells(projected_getter, realized_getter)
+        rows.append({"type": row_type, "label": label, "kind": kind, "cells": cells, "total": row_total(cells, kind)})
+
+    rows.append({"type": "section", "label": "RESUMO DO CAIXA", "cells": [None for _month in months], "total": None})
+    add_value_row("Saldo inicial", "saldo", lambda month: actual_value(month, "saldo_inicial"), lambda month: actual_value(month, "saldo_inicial"))
+    add_value_row("Receitas totais", "entrada", lambda month: planned_value(month, "planned_inflows"), lambda month: actual_value(month, "entradas"))
+    add_value_row("Saídas totais", "saida", lambda month: planned_value(month, "planned_outflows"), lambda month: actual_value(month, "saidas"))
+    add_value_row("Resultado do mês", "resultado", lambda month: planned_value(month, "planned_balance"), lambda month: actual_value(month, "saldo_mes"))
+    add_value_row("Saldo final", "saldo", lambda month: None, lambda month: actual_value(month, "saldo_final"))
+
+    section_order = [
+        "RECEITAS",
+        "CUSTOS (Compras)",
+        "DESPESAS (pagamentos)",
+        "IMPOSTOS",
+        "DESPESAS COM PESSOAL",
+        "FINANCEIRO",
+        "TRANSFERÊNCIAS",
+    ]
+    remaining_sections = sorted(section for section in section_account_totals if section not in section_order)
+    for section in section_order + remaining_sections:
+        account_totals = section_account_totals.get(section)
+        if not account_totals:
+            continue
+        kind = section_kinds.get(section, "saida")
+        rows.append({"type": "section", "label": section, "cells": [None for _month in months], "total": None})
+
+        def section_realized(month: str, section_name: str = section) -> float:
+            return sum(values.get(month, {}).get("realized", 0) or 0 for (entry_section, _account), values in account_month_values.items() if entry_section == section_name)
+
+        add_value_row(f"TOTAL {section}", kind, lambda _month: None, section_realized, "total")
+        for account_name, _total in sorted(account_totals.items(), key=lambda item: item[0]):
+            def account_realized(month: str, section_name: str = section, name: str = account_name) -> float:
+                return account_month_values[(section_name, name)].get(month, {}).get("realized", 0) or 0
+
+            add_value_row(account_name, kind, lambda _month: None, account_realized, "account")
 
     return {"months": months, "rows": rows}
 

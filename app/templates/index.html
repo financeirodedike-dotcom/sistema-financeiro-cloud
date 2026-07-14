@@ -201,7 +201,7 @@
     tr:nth-child(even) td { background: var(--surface-muted); }
     tbody tr:hover td { background: #eef8fb; }
     .cashflow-matrix-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
-    .cashflow-matrix { min-width: 1180px; border-spacing: 0; }
+    .cashflow-matrix { min-width: 1480px; border-spacing: 0; }
     .cashflow-matrix th:first-child,
     .cashflow-matrix td:first-child {
       position: sticky;
@@ -213,6 +213,10 @@
     .cashflow-matrix th:first-child { z-index: 3; }
     .cashflow-matrix td { text-align: right; white-space: nowrap; }
     .cashflow-matrix .row-label { text-align: left; font-weight: 800; color: var(--blue); background: #f8fbff; }
+    .cashflow-matrix .month-head { text-align: center; background: #eef4f8; color: var(--blue); border-left: 2px solid var(--line-strong); }
+    .cashflow-matrix .sub-head { text-align: center; font-size: 11px; }
+    .cashflow-matrix .projected-cell { background: #fff7dc; color: var(--text); }
+    .cashflow-matrix .realized-cell { background: #f8fbff; }
     .cashflow-matrix .section-row td {
       background: #071f35;
       color: white;
@@ -229,6 +233,8 @@
     .cashflow-matrix .kind-saldo td:not(.row-label),
     .cashflow-matrix .kind-resultado td:not(.row-label),
     .cashflow-matrix .kind-variacao td:not(.row-label) { font-weight: 900; }
+    .cashflow-matrix .total-row td { font-weight: 900; border-top: 2px solid var(--line-strong); }
+    .cashflow-matrix .account-row .row-label { font-weight: 650; color: var(--text); padding-left: 22px; }
     .cashflow-matrix .total-col { background: #e8f1f8; font-weight: 900; }
     tr.classified-row { background: #ecfdf3; }
     tr.pending-row { background: #fff8e6; }
@@ -1447,11 +1453,19 @@
           <table class="cashflow-matrix">
             <thead>
               <tr>
-                <th>Fluxo de caixa</th>
+                <th rowspan="2">Fluxo de caixa</th>
                 {% for month in cashflow_matrix.months %}
-                <th>{{ month|month_br }}</th>
+                <th class="month-head" colspan="2">{{ month|month_br }}</th>
                 {% endfor %}
-                <th>Total</th>
+                <th class="month-head" colspan="2">Total</th>
+              </tr>
+              <tr>
+                {% for month in cashflow_matrix.months %}
+                <th class="sub-head">Projetado</th>
+                <th class="sub-head">Realizado</th>
+                {% endfor %}
+                <th class="sub-head">Projetado</th>
+                <th class="sub-head">Realizado</th>
               </tr>
             </thead>
             <tbody>
@@ -1459,16 +1473,18 @@
               {% if row.type == "section" %}
               <tr class="section-row">
                 <td>{{ row.label }}</td>
-                {% for cell in row.cells %}<td></td>{% endfor %}
-                <td></td>
+                {% for cell in row.cells %}<td colspan="2"></td>{% endfor %}
+                <td colspan="2"></td>
               </tr>
               {% else %}
-              <tr class="kind-{{ row.kind }}">
+              <tr class="kind-{{ row.kind }} {{ 'total-row' if row.type == 'total' else 'account-row' if row.type == 'account' else '' }}">
                 <td class="row-label">{{ row.label }}</td>
-                {% for value in row.cells %}
-                <td class="{{ 'negative' if value < 0 else 'positive' if value > 0 else '' }}">{{ value|brl }}</td>
+                {% for cell in row.cells %}
+                <td class="projected-cell {{ 'negative' if cell.projected and cell.projected < 0 else 'positive' if cell.projected and cell.projected > 0 else '' }}">{% if cell.projected is none %}-{% else %}{{ cell.projected|brl }}{% endif %}</td>
+                <td class="realized-cell {{ 'negative' if cell.realized < 0 else 'positive' if cell.realized > 0 else '' }}">{{ cell.realized|brl }}</td>
                 {% endfor %}
-                <td class="total-col {{ 'negative' if row.total < 0 else 'positive' if row.total > 0 else '' }}">{{ row.total|brl }}</td>
+                <td class="total-col projected-cell {{ 'negative' if row.total.projected and row.total.projected < 0 else 'positive' if row.total.projected and row.total.projected > 0 else '' }}">{% if row.total.projected is none %}-{% else %}{{ row.total.projected|brl }}{% endif %}</td>
+                <td class="total-col realized-cell {{ 'negative' if row.total.realized < 0 else 'positive' if row.total.realized > 0 else '' }}">{{ row.total.realized|brl }}</td>
               </tr>
               {% endif %}
               {% endfor %}
