@@ -86,7 +86,8 @@
       padding: 10px 14px;
       box-shadow: 0 8px 18px rgba(15,35,55,.04);
     }
-    .tabs label {
+    .tabs label,
+    .tabs a {
       display: flex;
       align-items: center;
       padding: 10px 13px;
@@ -95,10 +96,12 @@
       font-weight: 800;
       cursor: pointer;
       white-space: nowrap;
+      text-decoration: none;
       border: 1px solid transparent;
       transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
     }
-    .tabs label:hover {
+    .tabs label:hover,
+    .tabs a:hover {
       background: #e8f1f8;
       border-color: #d2e1ee;
       transform: translateY(-1px);
@@ -127,7 +130,8 @@
     #tab-producao:checked ~ .tabs label[for="tab-producao"],
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
     #tab-antecipacoes:checked ~ .tabs label[for="tab-antecipacoes"],
-    #tab-acessos:checked ~ .tabs label[for="tab-acessos"] {
+    #tab-acessos:checked ~ .tabs label[for="tab-acessos"],
+    .tabs a.active {
       background: var(--blue);
       color: white;
       box-shadow: 0 10px 22px rgba(18,53,91,.16);
@@ -350,18 +354,18 @@
   <input id="tab-acessos" name="tab" type="radio" {% if active_tab == "acessos" %}checked{% endif %}>
 
   <nav class="tabs">
-    <label for="tab-dashboard">Centro de Controle</label>
-    <label for="tab-financeiro">Financeiro</label>
-    <label for="tab-cadastros">Cadastros</label>
-    <label for="tab-compras">Compras</label>
-    <label for="tab-balanco">Balanco</label>
-    <label for="tab-fiscal">Fiscal</label>
-    <label for="tab-rh">RH</label>
-    <label for="tab-vendas">Vendas</label>
-    <label for="tab-marketing">Marketing</label>
-    <label for="tab-producao">Producao</label>
-    <label for="tab-mapa">Mapa Empresarial 360</label>
-    <label for="tab-acessos">Acessos e Usuarios</label>
+    <a class="{{ 'active' if active_tab == 'dashboard' else '' }}" href="/?tab=dashboard">Centro de Controle</a>
+    <a class="{{ 'active' if active_tab == 'financeiro' else '' }}" href="/?tab=financeiro">Financeiro</a>
+    <a class="{{ 'active' if active_tab == 'cadastros' else '' }}" href="/?tab=cadastros">Cadastros</a>
+    <a class="{{ 'active' if active_tab == 'compras' else '' }}" href="/?tab=compras">Compras</a>
+    <a class="{{ 'active' if active_tab == 'balanco' else '' }}" href="/?tab=balanco">Balanco</a>
+    <a class="{{ 'active' if active_tab == 'fiscal' else '' }}" href="/?tab=fiscal">Fiscal</a>
+    <a class="{{ 'active' if active_tab == 'rh' else '' }}" href="/?tab=rh">RH</a>
+    <a class="{{ 'active' if active_tab == 'vendas' else '' }}" href="/?tab=vendas">Vendas</a>
+    <a class="{{ 'active' if active_tab == 'marketing' else '' }}" href="/?tab=marketing">Marketing</a>
+    <a class="{{ 'active' if active_tab == 'producao' else '' }}" href="/?tab=producao">Producao</a>
+    <a class="{{ 'active' if active_tab == 'mapa' else '' }}" href="/?tab=mapa">Mapa Empresarial 360</a>
+    <a class="{{ 'active' if active_tab == 'acessos' else '' }}" href="/?tab=acessos">Acessos e Usuarios</a>
   </nav>
 
   <main>

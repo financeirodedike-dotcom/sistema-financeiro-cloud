@@ -84,3 +84,19 @@ def ensure_lightweight_migrations():
             for name, ddl in new_columns.items():
                 if name not in existing_columns:
                     connection.execute(text(f"ALTER TABLE anticipations ADD COLUMN {name} {ddl}"))
+
+        index_statements = [
+            ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_date_id ON transactions (company_id, date DESC, id DESC)"),
+            ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_bank_date ON transactions (company_id, bank, date DESC)"),
+            ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_account ON transactions (company_id, account_id)"),
+            ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_fitid ON transactions (company_id, fitid)"),
+            ("transaction_splits", "CREATE INDEX IF NOT EXISTS idx_transaction_splits_transaction ON transaction_splits (transaction_id)"),
+            ("transaction_splits", "CREATE INDEX IF NOT EXISTS idx_transaction_splits_company_account ON transaction_splits (company_id, account_id)"),
+            ("import_batches", "CREATE INDEX IF NOT EXISTS idx_import_batches_company_created ON import_batches (company_id, created_at DESC)"),
+            ("receivables", "CREATE INDEX IF NOT EXISTS idx_receivables_company_due ON receivables (company_id, due_date DESC)"),
+            ("debts", "CREATE INDEX IF NOT EXISTS idx_debts_company_status_due ON debts (company_id, status, due_date)"),
+            ("anticipations", "CREATE INDEX IF NOT EXISTS idx_anticipations_company_created ON anticipations (company_id, created_at DESC)"),
+        ]
+        for table_name, statement in index_statements:
+            if table_name in table_names:
+                connection.execute(text(statement))

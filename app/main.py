@@ -359,6 +359,96 @@ def build_control_agenda(tasks: list[CompanyTask], debts: list[Debt], receivable
     }
 
 
+def empty_control_agenda() -> dict:
+    today = date.today()
+    return {
+        "today": today,
+        "week_end": today + timedelta(days=7),
+        "today_tasks": [],
+        "week_tasks": [],
+        "payable_today": [],
+        "payable_week": [],
+        "receivable_today": [],
+        "receivable_week": [],
+        "calendar_days": [],
+        "payable_today_total": 0,
+        "payable_week_total": 0,
+        "receivable_today_total": 0,
+        "receivable_week_total": 0,
+    }
+
+
+def empty_cashflow_totals() -> dict:
+    return {
+        "saldo_inicial": 0,
+        "entradas": 0,
+        "saidas": 0,
+        "saldo_periodo": 0,
+        "saldo_acumulado": 0,
+        "saldo_final": 0,
+    }
+
+
+def empty_cashflow_diagnostics() -> dict:
+    return {
+        "worst_months": [],
+        "month_breakdown": [],
+        "bank_breakdown": [],
+        "account_breakdown": [],
+        "expense_groups": [],
+        "unclassified_outflows": 0,
+        "negative_months_total": 0,
+        "positive_months_total": 0,
+        "net_difference": 0,
+    }
+
+
+def empty_planned_cashflow() -> dict:
+    return {
+        "rows": [],
+        "totals": {
+            "planned_inflows": 0,
+            "planned_outflows": 0,
+            "planned_balance": 0,
+            "actual_balance": 0,
+            "variance": 0,
+        },
+    }
+
+
+def empty_bank_reconciliation() -> dict:
+    return {
+        "rows": [],
+        "totals": {"entradas": 0, "saidas": 0, "difference": 0, "pending": 0},
+    }
+
+
+def empty_balance_sheet() -> dict:
+    return {
+        "cash_balance": 0,
+        "receivables": 0,
+        "assets_total": 0,
+        "debt_total": 0,
+        "equity": 0,
+        "monthly_installments": 0,
+    }
+
+
+def empty_dashboard() -> dict:
+    return {
+        "receitas": 0,
+        "despesas": 0,
+        "resultado": 0,
+        "saldo": 0,
+        "pendentes": 0,
+        "total_lancamentos": 0,
+    }
+
+
+def empty_charts() -> dict:
+    return {"flow_rows": [], "expense_groups": [], "total_debt": 0, "monthly_installments": 0}
+
+
 def normalize_account_name(name: str) -> str:
     return " ".join(name.strip().upper().split())
 
@@ -538,7 +628,7 @@ def logout():
     return response
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/__old-home", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     context = require_context(request, db)
     if isinstance(context, RedirectResponse):
@@ -757,6 +847,380 @@ def home(request: Request, db: Session = Depends(get_db)):
             "balance": balance_sheet(db, company.id, report_transactions),
             "purchases": purchases_report,
             "charts": dashboard_charts(db, company.id, cashflow_report, report_transactions),
+        },
+    )
+
+
+@app.get("/", response_class=HTMLResponse)
+def home_fast(request: Request, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    user, company = context
+    seed_company_accounts(db, company)
+
+    valid_tabs = {
+        "dashboard",
+        "financeiro",
+        "cadastros",
+        "extratos",
+        "contabilizados",
+        "classificacao",
+        "compras",
+        "fluxo",
+        "caixa-planejado",
+        "conciliacao",
+        "dre",
+        "balanco",
+        "endividamento",
+        "contas-pagar",
+        "contas-receber",
+        "antecipacoes",
+        "fiscal",
+        "rh",
+        "vendas",
+        "marketing",
+        "producao",
+        "mapa",
+        "acessos",
+    }
+    active_tab = request.query_params.get("tab", "dashboard")
+    if active_tab not in valid_tabs:
+        active_tab = "dashboard"
+
+    report_tabs = {
+        "dashboard",
+        "financeiro",
+        "compras",
+        "fluxo",
+        "caixa-planejado",
+        "conciliacao",
+        "dre",
+        "balanco",
+        "contas-pagar",
+        "mapa",
+    }
+    needs_reports = active_tab in report_tabs
+    needs_transactions = active_tab in {"extratos", "contabilizados", "contas-receber"}
+    needs_registry = active_tab in {"dashboard", "cadastros", "compras", "vendas"}
+    needs_receivables = active_tab in {"dashboard", "contas-receber", "antecipacoes", "mapa"}
+    needs_debts = active_tab in {"dashboard", "endividamento", "contas-pagar", "balanco", "mapa"}
+    needs_agenda = active_tab in {"dashboard", "mapa"}
+    needs_anticipations = active_tab == "antecipacoes"
+    needs_access = active_tab == "acessos"
+
+    accounts = db.scalars(
+        select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.name)
+    ).all()
+    rules = (
+        db.scalars(
+            select(ClassificationRule).where(ClassificationRule.company_id == company.id).order_by(ClassificationRule.keyword)
+        ).all()
+        if active_tab == "classificacao"
+        else []
+    )
+
+    date_from_raw = request.query_params.get("date_from", "")
+    date_to_raw = request.query_params.get("date_to", "")
+    bank_filter = request.query_params.get("bank", "")
+    history_filter = request.query_params.get("history", "").strip()
+    sort_order = request.query_params.get("sort", "desc")
+    accounted_account_raw = request.query_params.get("accounted_account_id", "")
+    try:
+        accounted_account_id = int(accounted_account_raw) if accounted_account_raw else None
+    except ValueError:
+        accounted_account_id = None
+    date_from = parse_filter_date(date_from_raw)
+    date_to = parse_filter_date(date_to_raw)
+
+    transaction_rows = []
+    if needs_transactions:
+        transaction_query = (
+            select(Transaction)
+            .where(Transaction.company_id == company.id)
+            .options(
+                selectinload(Transaction.account),
+                selectinload(Transaction.splits).selectinload(TransactionSplit.account),
+            )
+        )
+        if date_from:
+            transaction_query = transaction_query.where(Transaction.date >= date_from)
+        if date_to:
+            transaction_query = transaction_query.where(Transaction.date <= date_to)
+        if bank_filter:
+            transaction_query = transaction_query.where(Transaction.bank == bank_filter)
+        if history_filter:
+            transaction_query = transaction_query.where(Transaction.history.ilike(f"%{history_filter}%"))
+        if sort_order == "asc":
+            transaction_query = transaction_query.order_by(Transaction.date.asc(), Transaction.id.asc())
+        else:
+            sort_order = "desc"
+            transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
+        transaction_rows = db.scalars(transaction_query.limit(600)).all()
+
+    report_transactions = (
+        db.scalars(
+            select(Transaction)
+            .where(Transaction.company_id == company.id)
+            .options(
+                selectinload(Transaction.account),
+                selectinload(Transaction.splits).selectinload(TransactionSplit.account),
+            )
+        ).all()
+        if needs_reports
+        else []
+    )
+    accounted_transactions = [row for row in transaction_rows if is_transaction_accounted(row)] if needs_transactions else []
+    accounted_groups = build_accounted_groups(accounted_transactions, accounted_account_id) if active_tab == "contabilizados" else []
+    transactions = [row for row in transaction_rows if not is_transaction_accounted(row)] if needs_transactions else []
+    classified_count = len(accounted_transactions)
+    pending_count = len(transactions)
+
+    bank_options = (
+        db.scalars(
+            select(Transaction.bank)
+            .where(Transaction.company_id == company.id, Transaction.bank != "")
+            .distinct()
+            .order_by(Transaction.bank)
+        ).all()
+        if active_tab in {"extratos", "contabilizados", "conciliacao"}
+        else []
+    )
+    imports = (
+        db.scalars(
+            select(ImportBatch).where(ImportBatch.company_id == company.id).order_by(ImportBatch.created_at.desc()).limit(10)
+        ).all()
+        if active_tab in {"dashboard", "extratos"}
+        else []
+    )
+
+    current_user_membership = current_membership(user, company, db)
+    user_memberships = (
+        db.scalars(
+            select(Membership)
+            .where(Membership.company_id == company.id)
+            .options(selectinload(Membership.user))
+            .order_by(Membership.created_at.desc())
+        ).all()
+        if needs_access
+        else []
+    )
+    customers = (
+        db.scalars(select(Customer).where(Customer.company_id == company.id).order_by(Customer.created_at.desc())).all()
+        if needs_registry
+        else []
+    )
+    suppliers = (
+        db.scalars(select(Supplier).where(Supplier.company_id == company.id).order_by(Supplier.created_at.desc())).all()
+        if needs_registry
+        else []
+    )
+    receivables = (
+        db.scalars(
+            select(Receivable)
+            .where(Receivable.company_id == company.id)
+            .order_by(Receivable.due_date.desc(), Receivable.created_at.desc())
+        ).all()
+        if needs_receivables
+        else []
+    )
+    receivable_rows = [
+        {
+            "item": row,
+            "status": receivable_status(row),
+            "overdue_days": receivable_overdue_days(row),
+            "total": receivable_total(row),
+        }
+        for row in receivables
+    ]
+    receivable_summary = {
+        "received_on_time": sum(item["total"] for item in receivable_rows if item["status"] == "Pago em dia"),
+        "received_late": sum(item["total"] for item in receivable_rows if item["status"] == "Pago em atraso"),
+        "open_total": sum(item["total"] for item in receivable_rows if item["status"] == "Em aberto"),
+        "overdue_total": sum(item["total"] for item in receivable_rows if item["status"] == "Vencido"),
+        "discount_total": sum(row.discount_value or 0 for row in receivables),
+        "interest_total": sum(row.interest_value or 0 for row in receivables),
+        "count": len(receivables),
+    }
+    active_users = sum(1 for membership in user_memberships if membership.user.is_active)
+    debts = (
+        db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+        if needs_debts
+        else []
+    )
+    notes = (
+        db.scalars(
+            select(CompanyNote).where(CompanyNote.company_id == company.id).order_by(CompanyNote.created_at.desc()).limit(5)
+        ).all()
+        if active_tab == "dashboard"
+        else []
+    )
+    tasks = (
+        db.scalars(
+            select(CompanyTask)
+            .where(CompanyTask.company_id == company.id)
+            .order_by(CompanyTask.due_date.asc(), CompanyTask.created_at.desc())
+        ).all()
+        if needs_agenda
+        else []
+    )
+    control_agenda = build_control_agenda(tasks, debts, receivable_rows) if needs_agenda else empty_control_agenda()
+
+    anticipations = (
+        db.scalars(
+            select(Anticipation).where(Anticipation.company_id == company.id).order_by(Anticipation.created_at.desc())
+        ).all()
+        if needs_anticipations
+        else []
+    )
+    anticipation_attachment_rows = (
+        db.scalars(
+            select(AnticipationAttachment)
+            .where(AnticipationAttachment.company_id == company.id)
+            .order_by(AnticipationAttachment.created_at.desc())
+        ).all()
+        if needs_anticipations
+        else []
+    )
+    anticipation_attachments: dict[int, list[AnticipationAttachment]] = {}
+    for attachment in anticipation_attachment_rows:
+        anticipation_attachments.setdefault(attachment.anticipation_id, []).append(attachment)
+    anticipation_total_titles = sum(row.title_value for row in anticipations)
+    anticipation_total_cost = sum(
+        anticipation_cost(row.title_value or 0, row.title_fee_rate or 0, row.interest_rate or 0, row.iof_value or 0, row.costs_value or 0)
+        for row in anticipations
+    )
+
+    debt_rows = [
+        {"debt": debt, "overdue_days": debt_overdue_days(debt), "position": current_debt_position(debt)}
+        for debt in debts
+    ] if active_tab == "endividamento" else []
+    report_debt_id = request.query_params.get("debt_report")
+    report_months_raw = request.query_params.get("debt_months", "120")
+    try:
+        report_months = int(report_months_raw)
+    except ValueError:
+        report_months = 12
+    selected_debt = None
+    if active_tab == "endividamento" and report_debt_id:
+        try:
+            selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
+        except ValueError:
+            selected_debt = None
+
+    cashflow_report = monthly_cashflow(db, company.id, report_transactions) if needs_reports else []
+    cashflow_totals = (
+        {
+            "saldo_inicial": cashflow_report[0]["saldo_inicial"] if cashflow_report else 0,
+            "entradas": sum(row["entradas"] for row in cashflow_report),
+            "saidas": sum(row["saidas"] for row in cashflow_report),
+            "saldo_periodo": sum(row["saldo_mes"] for row in cashflow_report),
+            "saldo_acumulado": cashflow_report[-1]["saldo_acumulado"] if cashflow_report else 0,
+            "saldo_final": cashflow_report[-1]["saldo_final"] if cashflow_report else 0,
+        }
+        if needs_reports
+        else empty_cashflow_totals()
+    )
+    cashflow_explanation = (
+        "As saidas do periodo ficaram maiores que as entradas."
+        if cashflow_totals["saldo_periodo"] < 0
+        else "As entradas do periodo ficaram maiores ou iguais as saidas."
+    )
+
+    dashboard_report = dashboard(db, company.id, report_transactions) if needs_reports else empty_dashboard()
+    cashflow_diagnostics_report = (
+        cashflow_diagnostics(db, company.id, report_transactions)
+        if active_tab in {"dashboard", "financeiro"}
+        else empty_cashflow_diagnostics()
+    )
+    planned_cashflow_report = (
+        planned_cashflow(db, company.id, cashflow_report)
+        if active_tab in {"dashboard", "caixa-planejado"}
+        else empty_planned_cashflow()
+    )
+    bank_reconciliation = (
+        bank_reconciliation_report(db, company.id, report_transactions)
+        if active_tab == "conciliacao"
+        else empty_bank_reconciliation()
+    )
+    dre_report = dre(db, company.id, report_transactions) if active_tab == "dre" else []
+    balance_report = balance_sheet(db, company.id, report_transactions) if active_tab in {"dashboard", "balanco"} else empty_balance_sheet()
+    purchases_report = purchases(db, company.id, report_transactions) if active_tab in {"dashboard", "compras"} else {"rows": [], "total": 0, "count": 0}
+    charts_report = (
+        dashboard_charts(db, company.id, cashflow_report, report_transactions)
+        if active_tab == "dashboard"
+        else empty_charts()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "user": user,
+            "company": company,
+            "accounts": accounts,
+            "rules": rules,
+            "transactions": transactions,
+            "accounted_transactions": accounted_transactions[:500],
+            "accounted_groups": accounted_groups,
+            "classified_count": classified_count,
+            "pending_count": pending_count,
+            "imports": imports,
+            "user_memberships": user_memberships,
+            "customers": customers,
+            "suppliers": suppliers,
+            "receivable_rows": receivable_rows,
+            "receivable_summary": receivable_summary,
+            "registry_summary": {
+                "customers": len(customers),
+                "active_customers": sum(1 for row in customers if row.status == "Ativo"),
+                "suppliers": len(suppliers),
+                "active_suppliers": sum(1 for row in suppliers if row.status == "Ativo"),
+            },
+            "access_summary": {
+                "total": len(user_memberships),
+                "active": active_users,
+                "inactive": len(user_memberships) - active_users,
+                "admins": sum(1 for membership in user_memberships if membership.role in {"owner", "admin"}),
+            },
+            "current_membership": current_user_membership,
+            "can_manage_access": can_manage_access(current_user_membership),
+            "debts": debts,
+            "notes": notes,
+            "tasks": tasks,
+            "control_agenda": control_agenda,
+            "anticipations": anticipations,
+            "anticipation_attachments": anticipation_attachments,
+            "anticipation_summary": {
+                "title_total": anticipation_total_titles,
+                "cost_total": anticipation_total_cost,
+                "net_total": anticipation_total_titles - anticipation_total_cost,
+            },
+            "debt_rows": debt_rows,
+            "debt_report": debt_evolution(selected_debt, report_months),
+            "debt_report_months": report_months,
+            "bank_sources": BANK_SOURCES,
+            "bank_options": bank_options,
+            "filters": {
+                "date_from": date_from_raw,
+                "date_to": date_to_raw,
+                "bank": bank_filter,
+                "history": history_filter,
+                "sort": sort_order,
+                "accounted_account_id": str(accounted_account_id or ""),
+            },
+            "active_tab": active_tab,
+            "dashboard": dashboard_report,
+            "cashflow": cashflow_report,
+            "cashflow_totals": cashflow_totals,
+            "cashflow_diagnostics": cashflow_diagnostics_report,
+            "cashflow_explanation": cashflow_explanation,
+            "planned_cashflow": planned_cashflow_report,
+            "bank_reconciliation": bank_reconciliation,
+            "dre": dre_report,
+            "balance": balance_report,
+            "purchases": purchases_report,
+            "charts": charts_report,
         },
     )
 
