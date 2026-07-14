@@ -486,7 +486,7 @@ def normalize_history(value: str) -> str:
 
 
 def duplicate_transaction_exists(db: Session, company_id: int, item: dict, bank: str) -> bool:
-    if item.get("fitid"):
+    if item.get("fitid") and not str(item.get("fitid")).startswith("generated:"):
         exists_by_fitid = db.scalar(
             select(Transaction).where(
                 Transaction.company_id == company_id,

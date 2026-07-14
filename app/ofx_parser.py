@@ -70,8 +70,8 @@ def parse_ofx(content: bytes, filename: str) -> list[dict]:
         history = " - ".join(part for part in (name, memo) if part) or _tag(block, "TRNTYPE")
         fitid = _tag(block, "FITID")
         if not fitid:
-            fingerprint = f"{posted.isoformat()}|{amount:.2f}|{history}|{filename}"
-            fitid = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()
+            fingerprint = f"{posted.isoformat()}|{amount:.2f}|{history}"
+            fitid = "generated:" + hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()
         rows.append(
             {
                 "date": posted,
