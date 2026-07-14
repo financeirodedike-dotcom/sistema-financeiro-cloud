@@ -203,6 +203,48 @@ def create_full_transaction_split(db: Session, company: Company, row: Transactio
     row.account_id = account.id
 
 
+def build_accounted_groups(rows: list[Transaction], account_filter_id: int | None = None) -> list[dict]:
+    grouped: dict[int, dict] = {}
+    for row in rows:
+        entries = []
+        if row.splits:
+            entries = [
+                {
+                    "account": split.account,
+                    "entrada": split.entrada,
+                    "saida": split.saida,
+                    "transaction": row,
+                    "notes": split.notes,
+                }
+                for split in row.splits
+                if split.account and split.account.name.upper() != "A CLASSIFICAR"
+            ]
+        elif row.account and row.account.name.upper() != "A CLASSIFICAR":
+            entries = [
+                {
+                    "account": row.account,
+                    "entrada": row.entrada,
+                    "saida": row.saida,
+                    "transaction": row,
+                    "notes": row.notes,
+                }
+            ]
+        for entry in entries:
+            account = entry["account"]
+            if account_filter_id and account.id != account_filter_id:
+                continue
+            group = grouped.setdefault(
+                account.id,
+                {"account": account, "entries": [], "entrada": 0, "saida": 0, "saldo": 0, "count": 0},
+            )
+            group["entries"].append(entry)
+            group["entrada"] += entry["entrada"]
+            group["saida"] += entry["saida"]
+            group["saldo"] += entry["entrada"] - entry["saida"]
+            group["count"] += 1
+    return sorted(grouped.values(), key=lambda item: item["account"].name)
+
+
 def update_reconciliation_from_ofx(
     db: Session,
     company: Company,
@@ -514,6 +556,11 @@ def home(request: Request, db: Session = Depends(get_db)):
     bank_filter = request.query_params.get("bank", "")
     history_filter = request.query_params.get("history", "").strip()
     sort_order = request.query_params.get("sort", "desc")
+    accounted_account_raw = request.query_params.get("accounted_account_id", "")
+    try:
+        accounted_account_id = int(accounted_account_raw) if accounted_account_raw else None
+    except ValueError:
+        accounted_account_id = None
     date_from = parse_filter_date(date_from_raw)
     date_to = parse_filter_date(date_to_raw)
     transaction_query = select(Transaction).where(Transaction.company_id == company.id)
@@ -532,6 +579,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         transaction_query = transaction_query.order_by(Transaction.date.desc(), Transaction.id.desc())
     transaction_rows = db.scalars(transaction_query.limit(2000)).all()
     accounted_transactions = [row for row in transaction_rows if is_transaction_accounted(row)]
+    accounted_groups = build_accounted_groups(accounted_transactions, accounted_account_id)
     transactions = [row for row in transaction_rows if not is_transaction_accounted(row)]
     classified_count = len(accounted_transactions)
     pending_count = len(transactions)
@@ -635,6 +683,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "rules": rules,
             "transactions": transactions,
             "accounted_transactions": accounted_transactions[:500],
+            "accounted_groups": accounted_groups,
             "classified_count": classified_count,
             "pending_count": pending_count,
             "imports": imports,
@@ -679,6 +728,7 @@ def home(request: Request, db: Session = Depends(get_db)):
                 "bank": bank_filter,
                 "history": history_filter,
                 "sort": sort_order,
+                "accounted_account_id": str(accounted_account_id or ""),
             },
             "active_tab": request.query_params.get("tab", "dashboard"),
             "dashboard": dashboard(db, company.id),

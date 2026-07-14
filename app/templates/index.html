@@ -828,24 +828,10 @@
             <button type="submit">Importar arquivo OFX</button>
           </form>
           <p class="muted">Escolha a origem do extrato para separar Banco do Brasil, Caixa Interno e outros bancos nos filtros. O sistema ignora repetidos pelo ID do banco e tambem por data + valor + banco + historico.</p>
-          <p class="muted">Quando o OFX trouxer saldo final do banco, a conciliacao do mes sera preenchida automaticamente.</p>
+          <p class="muted">Este mesmo importador tambem atualiza os saldos inicial e final quando o OFX trouxer essas informacoes. Assim fica um unico processo: importar lancamentos e atualizar conciliacao.</p>
           {% if request.query_params.get("balance_imported") == "1" %}
           <p class="positive">Saldo do OFX importado para a aba Financeiro > Conciliacao.</p>
           {% endif %}
-          <hr>
-          <h2>Atualizar saldos de OFX ja importado</h2>
-          <form action="/import-ofx-balances" method="post" enctype="multipart/form-data">
-            <select name="bank_account" required>
-              <option value="">Escolha banco/caixa</option>
-              {% for source in bank_sources %}
-              <option value="{{ source }}">{{ source }}</option>
-              {% endfor %}
-            </select>
-            <input name="bank_other" placeholder="Outro banco, se necessario">
-            <input type="file" name="file" accept=".ofx" required>
-            <button type="submit">Puxar somente saldos</button>
-          </form>
-          <p class="muted">Use este botao para mandar novamente um OFX antigo e atualizar saldo inicial/final na conciliacao sem duplicar lancamentos.</p>
         </div>
         <div class="panel">
           <h2>Lancamento manual</h2>
@@ -981,33 +967,58 @@
         </div>
       </div>
       <div class="panel">
-        <h2>Lancamentos contabilizados</h2>
+        <h2>Pesquisar contabilizados</h2>
+        <form action="/" method="get">
+          <input type="hidden" name="tab" value="contabilizados">
+          <input name="date_from" type="text" inputmode="numeric" placeholder="Data inicial dd/mm/aaaa" value="{{ filters.date_from }}">
+          <input name="date_to" type="text" inputmode="numeric" placeholder="Data final dd/mm/aaaa" value="{{ filters.date_to }}">
+          <select name="accounted_account_id">
+            <option value="">Todas as contas financeiras</option>
+            {% for account in accounts %}
+            <option value="{{ account.id }}" {% if filters.accounted_account_id == account.id|string %}selected{% endif %}>{{ account.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Pesquisar</button>
+          <a class="pill" href="/?tab=contabilizados">Limpar filtros</a>
+        </form>
+        <p class="muted">Use a data para conferir um periodo e a conta financeira para abrir rapidamente um grupo especifico.</p>
+      </div>
+      <div class="panel">
+        <h2>Contabilizados por conta financeira</h2>
         <div class="scroll">
           <table>
-            <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Conta(s) financeira(s)</th><th>Entrada</th><th>Saida</th><th>Observacoes</th></tr></thead>
+            <thead><tr><th>Conta financeira</th><th>Lancamentos</th><th>Entradas</th><th>Saidas</th><th>Saldo</th><th>Detalhes</th></tr></thead>
             <tbody>
-              {% for row in accounted_transactions %}
+              {% for group in accounted_groups %}
               <tr class="classified-row">
-                <td>{{ row.date|date_br }}</td>
-                <td>{{ row.history }}</td>
-                <td>{{ row.bank }}</td>
+                <td><strong>{{ group.account.name }}</strong><br><span class="muted">{{ group.account.group_name }} | {{ group.account.dre_line }}</span></td>
+                <td>{{ group.count }}</td>
+                <td>{{ group.entrada|brl }}</td>
+                <td>{{ group.saida|brl }}</td>
+                <td class="{{ 'negative' if group.saldo < 0 else 'positive' }}">{{ group.saldo|brl }}</td>
                 <td>
-                  <div class="split-list">
-                    {% if row.splits %}
-                      {% for split in row.splits %}
-                      <span class="pill">{{ split.account.name }}: {{ (split.entrada if split.entrada > 0 else split.saida)|brl }}</span>
-                      {% endfor %}
-                    {% else %}
-                      <span class="pill">{{ row.account.name if row.account else "A CLASSIFICAR" }}</span>
-                    {% endif %}
-                  </div>
+                  <details>
+                    <summary class="pill">Expandir lancamentos</summary>
+                    <table>
+                      <thead><tr><th>Data</th><th>Historico</th><th>Banco</th><th>Entrada</th><th>Saida</th><th>Observacoes</th></tr></thead>
+                      <tbody>
+                        {% for entry in group.entries %}
+                        <tr>
+                          <td>{{ entry.transaction.date|date_br }}</td>
+                          <td>{{ entry.transaction.history }}</td>
+                          <td>{{ entry.transaction.bank }}</td>
+                          <td>{{ entry.entrada|brl }}</td>
+                          <td>{{ entry.saida|brl }}</td>
+                          <td>{{ entry.transaction.notes }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </details>
                 </td>
-                <td>{{ row.entrada|brl }}</td>
-                <td>{{ row.saida|brl }}</td>
-                <td>{{ row.notes }}</td>
               </tr>
               {% else %}
-              <tr><td colspan="7">Nenhum lancamento contabilizado nos filtros atuais.</td></tr>
+              <tr><td colspan="6">Nenhum lancamento contabilizado nos filtros atuais.</td></tr>
               {% endfor %}
             </tbody>
           </table>
