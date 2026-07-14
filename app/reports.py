@@ -340,6 +340,32 @@ def _cashflow_matrix_v2(actual_rows: list[dict], planned_report: dict, transacti
         "BANCOS / EMPRESTIMOS",
         "INVESTIMENTOS",
     ]
+    section_total_labels = {
+        "RECEITAS": "RECEITAS TOTAIS",
+        "CUSTOS (Compras)": "CUSTOS TOTAIS",
+        "DESPESAS (pagamentos)": "DESPESAS TOTAIS",
+        "IMPOSTOS": "IMPOSTOS TOTAIS",
+        "DESPESAS COM PESSOAL": "DESPESAS COM PESSOAL TOTAIS",
+        "DESPESAS FINANCEIRAS": "DESPESAS BANCARIAS TOTAIS",
+        "DISTRIBUICAO TRABALHISTA / SOCIOS": "DISTRIBUICAO / SOCIOS TOTAIS",
+        "BANCOS": "BANCOS TOTAIS",
+        "BANCOS / EMPRESTIMOS": "CAPTACAO / EMPRESTIMOS TOTAIS",
+        "INVESTIMENTOS": "INVESTIMENTOS TOTAIS",
+    }
+    closing_rows_by_section = {
+        "DISTRIBUICAO TRABALHISTA / SOCIOS": (
+            "SOBRA/FALTA OPERACIONAL",
+            operational_sections,
+        ),
+        "BANCOS / EMPRESTIMOS": (
+            "SOBRA/FALTA APOS BANCOS",
+            operational_sections | bank_sections,
+        ),
+        "INVESTIMENTOS": (
+            "SOBRA/FALTA APOS INVESTIMENTOS",
+            operational_sections | bank_sections | investment_sections,
+        ),
+    }
     remaining_sections = sorted(section for section in section_account_totals if section not in section_order)
     for section in section_order + remaining_sections:
         account_totals = section_account_totals.get(section)
@@ -351,12 +377,22 @@ def _cashflow_matrix_v2(actual_rows: list[dict], planned_report: dict, transacti
         def section_realized(month: str, section_name: str = section) -> float:
             return sum(values.get(month, {}).get("realized", 0) or 0 for (entry_section, _account), values in account_month_values.items() if entry_section == section_name)
 
-        add_value_row(f"TOTAL {section}", kind, lambda _month: None, section_realized, "total")
         for account_name, _total in sorted(account_totals.items(), key=lambda item: item[0]):
             def account_realized(month: str, section_name: str = section, name: str = account_name) -> float:
                 return account_month_values[(section_name, name)].get(month, {}).get("realized", 0) or 0
 
             add_value_row(account_name, kind, lambda _month: None, account_realized, "account")
+        add_value_row(section_total_labels.get(section, f"TOTAL {section}"), kind, lambda _month: None, section_realized, "total")
+
+        if section in closing_rows_by_section:
+            label, closing_sections = closing_rows_by_section[section]
+            add_value_row(
+                label,
+                "fechamento",
+                lambda month: planned_value(month, "planned_balance"),
+                lambda month, sections=closing_sections: signed_section_sum(month, sections),
+                "closing",
+            )
 
     return {"months": months, "rows": rows}
 

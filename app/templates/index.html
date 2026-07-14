@@ -233,6 +233,17 @@
     .cashflow-matrix .kind-saldo td:not(.row-label),
     .cashflow-matrix .kind-resultado td:not(.row-label),
     .cashflow-matrix .kind-variacao td:not(.row-label) { font-weight: 900; }
+    .cashflow-matrix .kind-fechamento td {
+      background: #9fdd68;
+      color: #061929;
+      font-weight: 900;
+      border-top: 2px solid #2f6f1f;
+      border-bottom: 2px solid #2f6f1f;
+    }
+    .cashflow-matrix .kind-fechamento .realized-cell.negative,
+    .cashflow-matrix .kind-fechamento .total-col.negative { color: #b00020; }
+    .cashflow-matrix .kind-fechamento .realized-cell.positive,
+    .cashflow-matrix .kind-fechamento .total-col.positive { color: #005f2f; }
     .cashflow-matrix .total-row td { font-weight: 900; border-top: 2px solid var(--line-strong); }
     .cashflow-matrix .account-row .row-label { font-weight: 650; color: var(--text); padding-left: 22px; }
     .cashflow-matrix .total-col { background: #e8f1f8; font-weight: 900; }
