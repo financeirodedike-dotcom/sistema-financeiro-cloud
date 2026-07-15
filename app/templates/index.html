@@ -1845,6 +1845,7 @@
         <table class="debt-evolution-table">
           <thead>
             <tr>
+              <th>Mes</th>
               <th>Descricao</th>
               <th>Data do desc.</th>
               <th>Vencimento</th>
@@ -1861,6 +1862,7 @@
           <tbody>
             {% for row in debt_report.rows %}
             <tr>
+              <td>{{ row.period_label }}</td>
               <td>{{ debt_report.debt.creditor }}</td>
               <td>{{ row.period_start|date_br }}</td>
               <td>{{ row.due_date|date_br }}</td>
@@ -1877,7 +1879,7 @@
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="7">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
+              <td colspan="8">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
               <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
               <td>{{ debt_report.summary.total_credit_value|brl }}</td>
               <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
