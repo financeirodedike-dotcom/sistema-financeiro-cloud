@@ -730,6 +730,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
     first_due_date = debt.due_date or add_months(start_date)
     balance = capital
     rows = []
+    accumulated_interest = 0.0
 
     period_start = start_date
     period_due = first_due_date
@@ -742,12 +743,15 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         interest_base = capital if debt.interest_type == "Simples" else opening_balance
         daily_interest = (interest_base * rate) / 30 if rate else 0
         interest = daily_interest * days
-        credit_value = opening_balance + interest
-        payment = min(installment, credit_value) if installment > 0 and period_due <= reference_date else 0
-        balance = max(credit_value - payment, 0)
+        accumulated_interest += interest
+        gross_value = opening_balance + interest
+        net_credit_value = max(opening_balance - interest, 0)
+        payment = min(installment, gross_value) if installment > 0 and period_due <= reference_date else 0
+        balance = max(gross_value - payment, 0)
         rows.append(
             {
                 "month": month,
+                "description": debt.description or debt.creditor,
                 "period_start": period_start,
                 "due_date": period_due,
                 "days": days,
@@ -755,9 +759,13 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
                 "rate_pct": debt.monthly_interest_rate or 0,
                 "daily_interest": daily_interest,
                 "interest": interest,
-                "credit_value": credit_value,
+                "accumulated_interest": accumulated_interest,
+                "credit_value": net_credit_value,
+                "gross_value": gross_value,
                 "installment": payment,
+                "payment_note": "PAGO" if payment > 0 else "",
                 "closing_balance": balance,
+                "total_to_pay": balance,
             }
         )
         period_start = period_due
@@ -770,6 +778,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
             "reference_date": reference_date,
             "total_interest": sum(row["interest"] for row in rows),
             "total_paid": sum(row["installment"] for row in rows),
+            "total_credit_value": sum(row["credit_value"] for row in rows),
             "final_balance": rows[-1]["closing_balance"] if rows else capital,
             "rows_count": len(rows),
         },

@@ -247,6 +247,22 @@
     .cashflow-matrix .total-row td { font-weight: 900; border-top: 2px solid var(--line-strong); }
     .cashflow-matrix .account-row .row-label { font-weight: 650; color: var(--text); padding-left: 22px; }
     .cashflow-matrix .total-col { background: #e8f1f8; font-weight: 900; }
+    .debt-evolution-table th {
+      background: #86a948;
+      color: white;
+      border-right: 1px solid rgba(255,255,255,.55);
+    }
+    .debt-evolution-table td {
+      white-space: nowrap;
+      border-right: 1px solid #d7e5c4;
+    }
+    .debt-evolution-table tbody tr:nth-child(odd) td { background: #eef6e4; }
+    .debt-evolution-table tbody tr:nth-child(even) td { background: #ffffff; }
+    .debt-evolution-table tfoot td {
+      background: #dff0ce;
+      border-top: 2px solid #86a948;
+      font-weight: 900;
+    }
     tr.classified-row { background: #ecfdf3; }
     tr.pending-row { background: #fff8e6; }
     tr.classified-row td { background: #ecfdf3; }
@@ -1804,7 +1820,7 @@
       </div>
       <div class="panel">
         <h2>Relatorio de evolucao da divida</h2>
-        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, com juros proporcionais pelos dias de cada periodo.</p>
+        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, credito liquido, pagamento e total a pagar.</p>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="endividamento">
           <select name="debt_report">
@@ -1820,31 +1836,32 @@
         <div class="grid">
           <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
           <div class="kpi"><span>Total de juros</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
+          <div class="kpi"><span>Valor do credito</span><strong>{{ debt_report.summary.total_credit_value|brl }}</strong></div>
           <div class="kpi"><span>Total pago</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
           <div class="kpi"><span>A pagar hoje</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
         </div>
         <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Referencia: {{ debt_report.summary.reference_date|date_br }}.</p>
         <div class="scroll">
-        <table>
+        <table class="debt-evolution-table">
           <thead>
             <tr>
               <th>Descricao</th>
               <th>Data do desc.</th>
               <th>Vencimento</th>
-              <th>Dias</th>
+              <th>DIAS</th>
               <th>Valor</th>
               <th>Taxa</th>
               <th>Ao dia</th>
-              <th>Total juros</th>
+              <th>Total</th>
               <th>Valor do credito</th>
-              <th>Pago</th>
-              <th>A pagar</th>
+              <th>Total a pagar</th>
+              <th>Obs.</th>
             </tr>
           </thead>
           <tbody>
             {% for row in debt_report.rows %}
             <tr>
-              <td>{{ debt_report.debt.description or debt_report.debt.creditor }}</td>
+              <td>{{ debt_report.debt.creditor }}</td>
               <td>{{ row.period_start|date_br }}</td>
               <td>{{ row.due_date|date_br }}</td>
               <td>{{ row.days }}</td>
@@ -1853,8 +1870,8 @@
               <td>{{ row.daily_interest|brl }}</td>
               <td>{{ row.interest|brl }}</td>
               <td>{{ row.credit_value|brl }}</td>
-              <td class="positive">{{ row.installment|brl }}</td>
-              <td class="{{ 'negative' if row.closing_balance > 0 else 'positive' }}">{{ row.closing_balance|brl }}</td>
+              <td class="{{ 'negative' if row.total_to_pay > 0 else 'positive' }}">{{ row.total_to_pay|brl }}</td>
+              <td>{{ row.payment_note or debt_report.debt.notes }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1862,9 +1879,9 @@
             <tr>
               <td colspan="7">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
               <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
-              <td></td>
-              <td class="positive">{{ debt_report.summary.total_paid|brl }}</td>
+              <td>{{ debt_report.summary.total_credit_value|brl }}</td>
               <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
+              <td>Pagamentos: {{ debt_report.summary.total_paid|brl }}</td>
             </tr>
           </tfoot>
         </table>
