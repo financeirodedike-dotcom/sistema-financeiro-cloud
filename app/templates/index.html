@@ -1873,7 +1873,7 @@
               <td>{{ row.interest|brl }}</td>
               <td>{{ row.credit_value|brl }}</td>
               <td class="{{ 'negative' if row.total_to_pay > 0 else 'positive' }}">{{ row.total_to_pay|brl }}</td>
-              <td>{{ row.payment_note or debt_report.debt.notes }}</td>
+              <td>{{ row.period_note or row.payment_note or debt_report.debt.notes }}</td>
             </tr>
             {% endfor %}
           </tbody>
