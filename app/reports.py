@@ -717,6 +717,10 @@ def add_months(value: date, months: int = 1) -> date:
     return date(year, month, day)
 
 
+def month_start(value: date) -> date:
+    return date(value.year, value.month, 1)
+
+
 def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | None = None) -> dict:
     reference_date = reference_date or date.today()
     if not debt:
@@ -737,12 +741,14 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
 
     period_start = start_date
     period_due = first_due_date
+    period_month = month_start(start_date)
+    reference_month = month_start(reference_date)
     for month in range(1, months + 1):
-        if period_start > reference_date:
+        if period_month > reference_month:
             break
         period_end = min(period_due, reference_date)
         days = max((period_end - period_start).days, 0)
-        is_current_period = period_due > reference_date
+        is_current_period = period_month == reference_month
         is_simple_interest = debt.interest_type == "Simples"
         opening_balance = capital if is_simple_interest else balance
         interest_base = capital if is_simple_interest else balance
@@ -757,7 +763,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         rows.append(
             {
                 "month": month,
-                "period_label": period_start.strftime("%m/%Y"),
+                "period_label": period_month.strftime("%m/%Y"),
                 "description": debt.description or debt.creditor,
                 "period_start": period_start,
                 "due_date": period_due,
@@ -778,6 +784,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         )
         period_start = period_due
         period_due = add_months(period_due)
+        period_month = add_months(period_month)
     return {
         "debt": debt,
         "rows": rows,
