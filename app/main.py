@@ -31,6 +31,49 @@ def format_brl(value: float | int | None) -> str:
     return f"R$ {formatted}"
 
 
+def build_debt_row_summary(debt: Debt, position: dict) -> dict:
+    capital = debt.capital_value or 0
+    total_interest = position.get("interest_total", 0) or 0
+    total_paid = position.get("paid_total", 0) or 0
+    months_elapsed = position.get("months_elapsed", 0) or 0
+    return {
+        "title": debt.creditor or "Divida selecionada",
+        "total_loan": capital + total_interest,
+        "capital": capital,
+        "total_interest": total_interest,
+        "average_interest": total_interest / months_elapsed if months_elapsed else 0,
+        "monthly_interest": capital * ((debt.monthly_interest_rate or 0) / 100),
+        "final_balance": position.get("current_balance", 0) or 0,
+        "total_paid": total_paid,
+        "periods": months_elapsed,
+        "reference": date.today(),
+    }
+
+
+def build_debt_company_summary(debt_rows: list[dict]) -> dict:
+    capital = sum((item["debt"].capital_value or 0) for item in debt_rows)
+    total_interest = sum((item["position"].get("interest_total", 0) or 0) for item in debt_rows)
+    total_paid = sum((item["position"].get("paid_total", 0) or 0) for item in debt_rows)
+    final_balance = sum((item["position"].get("current_balance", 0) or 0) for item in debt_rows)
+    monthly_interest = sum(
+        (item["debt"].capital_value or 0) * ((item["debt"].monthly_interest_rate or 0) / 100)
+        for item in debt_rows
+    )
+    active_count = sum(1 for item in debt_rows if item["debt"].status == "Ativo")
+    return {
+        "title": "Todo endividamento da empresa",
+        "total_loan": capital + total_interest,
+        "capital": capital,
+        "total_interest": total_interest,
+        "average_interest": total_interest / len(debt_rows) if debt_rows else 0,
+        "monthly_interest": monthly_interest,
+        "final_balance": final_balance,
+        "total_paid": total_paid,
+        "periods": active_count,
+        "reference": date.today(),
+    }
+
+
 templates.env.filters["brl"] = format_brl
 
 
@@ -866,10 +909,18 @@ def home(request: Request, db: Session = Depends(get_db)):
         anticipation_cost(row.title_value or 0, row.title_fee_rate or 0, row.interest_rate or 0, row.iof_value or 0, row.costs_value or 0)
         for row in anticipations
     )
-    debt_rows = [
-        {"debt": debt, "overdue_days": debt_overdue_days(debt), "position": current_debt_position(debt)}
-        for debt in debts
-    ]
+    debt_rows = []
+    for debt in debts:
+        position = current_debt_position(debt)
+        debt_rows.append(
+            {
+                "debt": debt,
+                "overdue_days": debt_overdue_days(debt),
+                "position": position,
+                "summary": build_debt_row_summary(debt, position),
+            }
+        )
+    debt_company_summary = build_debt_company_summary(debt_rows)
     purchases_report = purchases(db, company.id, report_transactions)
     report_debt_id = request.query_params.get("debt_report")
     report_months_raw = request.query_params.get("debt_months", "120")
@@ -947,6 +998,7 @@ def home(request: Request, db: Session = Depends(get_db)):
                 "net_total": anticipation_total_titles - anticipation_total_cost,
             },
             "debt_rows": debt_rows,
+            "debt_company_summary": debt_company_summary,
             "debt_report": debt_evolution(selected_debt, report_months),
             "debt_report_months": report_months,
             "bank_sources": BANK_SOURCES,
@@ -1241,10 +1293,19 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         for row in anticipations
     )
 
-    debt_rows = [
-        {"debt": debt, "overdue_days": debt_overdue_days(debt), "position": current_debt_position(debt)}
-        for debt in debts
-    ] if active_tab == "endividamento" else []
+    debt_rows = []
+    if active_tab == "endividamento":
+        for debt in debts:
+            position = current_debt_position(debt)
+            debt_rows.append(
+                {
+                    "debt": debt,
+                    "overdue_days": debt_overdue_days(debt),
+                    "position": position,
+                    "summary": build_debt_row_summary(debt, position),
+                }
+            )
+    debt_company_summary = build_debt_company_summary(debt_rows)
     report_debt_id = request.query_params.get("debt_report")
     report_months_raw = request.query_params.get("debt_months", "120")
     try:
@@ -1357,6 +1418,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
                 "net_total": anticipation_total_titles - anticipation_total_cost,
             },
             "debt_rows": debt_rows,
+            "debt_company_summary": debt_company_summary,
             "debt_report": debt_evolution(selected_debt, report_months),
             "debt_report_months": report_months,
             "bank_sources": BANK_SOURCES,

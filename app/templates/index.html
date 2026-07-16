@@ -184,6 +184,8 @@
     .kpi strong { display: block; margin-top: 8px; font-size: 26px; letter-spacing: -.02em; }
     .debt-summary-grid { display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 12px; }
     .debt-summary-grid .kpi strong { font-size: 22px; }
+    .debt-row { cursor: pointer; }
+    .debt-row.is-selected td { background: #e0f2fe; }
     h2 { margin: 0 0 12px; color: var(--blue); font-size: 17px; letter-spacing: -.01em; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     th {
@@ -1738,25 +1740,36 @@
 
     <section id="endividamento" class="tab">
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
-      {% if debt_report.debt %}
-      <div class="panel">
-        <h2>Resumo da divida selecionada</h2>
+      <div
+        class="panel"
+        id="debt-summary-panel"
+        data-default-title="{{ debt_company_summary.title }}"
+        data-default-total-loan="{{ debt_company_summary.total_loan|brl }}"
+        data-default-capital="{{ debt_company_summary.capital|brl }}"
+        data-default-total-interest="{{ debt_company_summary.total_interest|brl }}"
+        data-default-average-interest="{{ debt_company_summary.average_interest|brl }}"
+        data-default-monthly-interest="{{ debt_company_summary.monthly_interest|brl }}"
+        data-default-final-balance="{{ debt_company_summary.final_balance|brl }}"
+        data-default-total-paid="{{ debt_company_summary.total_paid|brl }}"
+        data-default-periods="{{ debt_company_summary.periods }}"
+        data-default-reference="{{ debt_company_summary.reference|date_br }}"
+      >
+        <h2 id="debt-summary-title">{{ debt_company_summary.title }}</h2>
         <div class="debt-summary-grid">
-          <div class="kpi"><span>Total do emprestimo</span><strong>{{ debt_report.summary.total_loan|brl }}</strong></div>
-          <div class="kpi"><span>Capital</span><strong>{{ debt_report.summary.capital|brl }}</strong></div>
-          <div class="kpi"><span>Juros gerados</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
-          <div class="kpi"><span>Media de juros</span><strong class="negative">{{ debt_report.summary.average_interest|brl }}</strong></div>
-          <div class="kpi"><span>Juros mensais</span><strong class="negative">{{ debt_report.summary.monthly_interest|brl }}</strong></div>
-          <div class="kpi"><span>Valor a pagar</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
+          <div class="kpi"><span>Total do emprestimo</span><strong data-debt-field="totalLoan">{{ debt_company_summary.total_loan|brl }}</strong></div>
+          <div class="kpi"><span>Capital</span><strong data-debt-field="capital">{{ debt_company_summary.capital|brl }}</strong></div>
+          <div class="kpi"><span>Juros gerados</span><strong class="negative" data-debt-field="totalInterest">{{ debt_company_summary.total_interest|brl }}</strong></div>
+          <div class="kpi"><span>Media de juros</span><strong class="negative" data-debt-field="averageInterest">{{ debt_company_summary.average_interest|brl }}</strong></div>
+          <div class="kpi"><span>Juros mensais</span><strong class="negative" data-debt-field="monthlyInterest">{{ debt_company_summary.monthly_interest|brl }}</strong></div>
+          <div class="kpi"><span>Valor a pagar</span><strong class="{{ 'negative' if debt_company_summary.final_balance > 0 else 'positive' }}" data-debt-field="finalBalance">{{ debt_company_summary.final_balance|brl }}</strong></div>
         </div>
         <div class="grid">
-          <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
-          <div class="kpi"><span>Juros pagos/abatidos</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
-          <div class="kpi"><span>Periodos calculados</span><strong>{{ debt_report.summary.rows_count }}</strong></div>
-          <div class="kpi"><span>Referencia</span><strong>{{ debt_report.summary.reference_date|date_br }}</strong></div>
+          <div class="kpi"><span>Credor</span><strong data-debt-field="title">{{ debt_company_summary.title }}</strong></div>
+          <div class="kpi"><span>Juros pagos/abatidos</span><strong class="positive" data-debt-field="totalPaid">{{ debt_company_summary.total_paid|brl }}</strong></div>
+          <div class="kpi"><span>Dividas ativas/periodos</span><strong data-debt-field="periods">{{ debt_company_summary.periods }}</strong></div>
+          <div class="kpi"><span>Referencia</span><strong data-debt-field="reference">{{ debt_company_summary.reference|date_br }}</strong></div>
         </div>
       </div>
-      {% endif %}
       <div class="panel">
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
@@ -1783,7 +1796,7 @@
           <button type="submit">Salvar divida</button>
         </form>
       </div>
-      <div class="panel">
+      <div class="panel" id="debt-table-panel">
         <h2>Endividamento</h2>
         <table>
           <thead><tr><th>Data divida</th><th>Vencimento</th><th>Dias atraso</th><th>Tipo</th><th>Credor</th><th>Descricao</th><th>Capital original</th><th>Meses atual.</th><th>Juros acum.</th><th>Parcelas abatidas</th><th>Saldo atualizado</th><th>Juros</th><th>Parcela</th><th>Status</th><th>Relatorio</th><th>Editar</th></tr></thead>
@@ -1791,7 +1804,21 @@
             {% for item in debt_rows %}
             {% set debt = item.debt %}
             {% set position = item.position %}
-            <tr>
+            {% set summary = item.summary %}
+            <tr
+              class="debt-row"
+              tabindex="0"
+              data-title="{{ summary.title }}"
+              data-total-loan="{{ summary.total_loan|brl }}"
+              data-capital="{{ summary.capital|brl }}"
+              data-total-interest="{{ summary.total_interest|brl }}"
+              data-average-interest="{{ summary.average_interest|brl }}"
+              data-monthly-interest="{{ summary.monthly_interest|brl }}"
+              data-final-balance="{{ summary.final_balance|brl }}"
+              data-total-paid="{{ summary.total_paid|brl }}"
+              data-periods="{{ summary.periods }}"
+              data-reference="{{ summary.reference|date_br }}"
+            >
               <td>{{ debt.debt_date|date_br }}</td>
               <td>{{ debt.due_date|date_br }}</td>
               <td class="{{ 'negative' if item.overdue_days > 0 else 'positive' }}">{{ item.overdue_days }}</td>
@@ -2369,6 +2396,55 @@
       document.getElementById("sim-result").textContent =
         `Custo estimado ${formatBRL(totalCost)} | Liquido estimado ${formatBRL(net)}`;
     }
+
+    const debtPanel = document.getElementById("debt-summary-panel");
+    const debtRows = document.querySelectorAll(".debt-row");
+    const debtFieldMap = {
+      title: "title",
+      totalLoan: "totalLoan",
+      capital: "capital",
+      totalInterest: "totalInterest",
+      averageInterest: "averageInterest",
+      monthlyInterest: "monthlyInterest",
+      finalBalance: "finalBalance",
+      totalPaid: "totalPaid",
+      periods: "periods",
+      reference: "reference",
+    };
+
+    function setDebtPanel(source, selectedRow = null) {
+      if (!debtPanel || !source) return;
+      const title = source.title || source.defaultTitle || "Todo endividamento da empresa";
+      document.getElementById("debt-summary-title").textContent = title;
+      Object.entries(debtFieldMap).forEach(([field, dataKey]) => {
+        const element = debtPanel.querySelector(`[data-debt-field="${field}"]`);
+        if (element) {
+          element.textContent = source[dataKey] || source[`default${dataKey.charAt(0).toUpperCase()}${dataKey.slice(1)}`] || "-";
+        }
+      });
+      debtRows.forEach((row) => row.classList.toggle("is-selected", row === selectedRow));
+    }
+
+    debtRows.forEach((row) => {
+      const applyRow = (event) => {
+        if (event.target.closest("a, button, details, summary, input, select, form")) return;
+        event.stopPropagation();
+        setDebtPanel(row.dataset, row);
+      };
+      row.addEventListener("click", applyRow);
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setDebtPanel(row.dataset, row);
+        }
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!debtPanel) return;
+      if (event.target.closest("#debt-table-panel .debt-row")) return;
+      setDebtPanel(debtPanel.dataset);
+    });
   </script>
 </body>
 </html>
