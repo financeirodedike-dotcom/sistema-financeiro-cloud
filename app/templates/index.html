@@ -1870,6 +1870,19 @@
             </tr>
             {% endfor %}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6">Totalizadores do endividamento</td>
+              <td>{{ debt_company_summary.capital|brl }}</td>
+              <td>{{ debt_company_summary.periods }}</td>
+              <td class="negative">{{ debt_company_summary.total_interest|brl }}</td>
+              <td class="positive">{{ debt_company_summary.total_paid|brl }}</td>
+              <td class="{{ 'negative' if debt_company_summary.final_balance > 0 else 'positive' }}">{{ debt_company_summary.final_balance|brl }}</td>
+              <td class="negative">{{ debt_company_summary.monthly_interest|brl }}/mes</td>
+              <td>{{ debt_company_summary.installments|brl }}</td>
+              <td colspan="3">Total do emprestimo: {{ debt_company_summary.total_loan|brl }}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div class="panel">
@@ -1979,10 +1992,16 @@
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="8">Totais ate {{ debt_report.summary.calculation_date|date_br }}</td>
+              <td colspan="5">Totais ate {{ debt_report.summary.calculation_date|date_br }}</td>
+              <td>{{ debt_report.summary.capital|brl }}</td>
+              <td>Media: {{ debt_report.summary.average_interest|brl }}</td>
+              <td>{{ debt_report.summary.monthly_interest|brl }}/mes</td>
               <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
               <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
               <td>Pagamentos: {{ debt_report.summary.total_paid|brl }}</td>
+            </tr>
+            <tr>
+              <td colspan="11">Total do emprestimo: {{ debt_report.summary.total_loan|brl }} | Capital: {{ debt_report.summary.capital|brl }} | Juros mensais: {{ debt_report.summary.monthly_interest|brl }}</td>
             </tr>
           </tfoot>
         </table>

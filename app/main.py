@@ -55,6 +55,7 @@ def build_debt_company_summary(debt_rows: list[dict]) -> dict:
     total_interest = sum((item["position"].get("interest_total", 0) or 0) for item in debt_rows)
     total_paid = sum((item["position"].get("paid_total", 0) or 0) for item in debt_rows)
     final_balance = sum((item["position"].get("current_balance", 0) or 0) for item in debt_rows)
+    installments = sum((item["debt"].installment_value or 0) for item in debt_rows)
     monthly_interest = sum(
         (item["debt"].capital_value or 0) * ((item["debt"].monthly_interest_rate or 0) / 100)
         for item in debt_rows
@@ -69,6 +70,7 @@ def build_debt_company_summary(debt_rows: list[dict]) -> dict:
         "monthly_interest": monthly_interest,
         "final_balance": final_balance,
         "total_paid": total_paid,
+        "installments": installments,
         "periods": active_count,
         "reference": date.today(),
     }
