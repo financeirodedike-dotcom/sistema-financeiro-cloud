@@ -731,6 +731,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
     rate = (debt.monthly_interest_rate or 0) / 100
     installment = debt.installment_value or 0
     start_date = debt.debt_date or debt.due_date or reference_date
+    calculation_date = debt.due_date or reference_date
     first_due_date = debt.due_date or add_months(start_date)
     if first_due_date <= start_date:
         first_due_date = add_months(start_date)
@@ -739,7 +740,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
     accumulated_interest = 0.0
     paid_total = 0.0
     registered_payments = sorted(
-        [payment for payment in getattr(debt, "payments", []) if payment.payment_date <= reference_date],
+        [payment for payment in getattr(debt, "payments", []) if payment.payment_date <= calculation_date],
         key=lambda payment: payment.payment_date,
     )
     applied_payment_ids: set[int] = set()
@@ -747,13 +748,13 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
     period_start = start_date
     period_due = first_due_date
     period_month = month_start(start_date)
-    reference_month = month_start(reference_date)
+    reference_month = month_start(calculation_date)
     for month in range(1, months + 1):
         if period_month > reference_month:
             break
-        period_end = min(period_due, reference_date)
+        period_end = min(period_due, calculation_date)
         actual_days = max((period_end - period_start).days, 0)
-        days = min(actual_days, 30) if period_due > reference_date else 30
+        days = min(actual_days, 30)
         is_current_period = period_month == reference_month
         is_simple_interest = debt.interest_type == "Simples"
         opening_balance = capital if is_simple_interest else balance
@@ -770,7 +771,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         real_payment = sum(payment.amount or 0 for payment in period_payments)
         for payment in period_payments:
             applied_payment_ids.add(payment.id)
-        scheduled_payment = min(installment, gross_value) if installment > 0 and period_due <= reference_date else 0
+        scheduled_payment = min(installment, gross_value) if installment > 0 and period_due <= calculation_date else 0
         payment = min(real_payment if real_payment > 0 else scheduled_payment, gross_value)
         paid_total += payment
         balance = max(gross_value - payment, 0)
@@ -810,6 +811,7 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         "months": months,
         "summary": {
             "reference_date": reference_date,
+            "calculation_date": calculation_date,
             "capital": capital,
             "total_loan": capital + total_interest,
             "total_interest": total_interest,
@@ -852,5 +854,5 @@ def current_debt_position(debt: Debt, reference_date: date | None = None) -> dic
         "interest_total": summary["total_interest"],
         "paid_total": summary["total_paid"],
         "current_balance": summary["final_balance"],
-        "reference_date": reference_date,
+        "reference_date": summary.get("calculation_date", reference_date),
     }

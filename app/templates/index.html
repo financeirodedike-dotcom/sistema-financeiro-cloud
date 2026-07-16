@@ -1887,7 +1887,7 @@
           <button type="submit">Gerar evolucao</button>
         </form>
         {% if debt_report.debt %}
-        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Referencia: {{ debt_report.summary.reference_date|date_br }}.</p>
+        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Calculado ate: {{ debt_report.summary.calculation_date|date_br }}.</p>
         <details class="debt-edit payment-register">
           <summary>Registrar pagamento</summary>
           <form action="/debts/{{ debt_report.debt.id }}/payments" method="post">
@@ -1979,7 +1979,7 @@
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="8">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
+              <td colspan="8">Totais ate {{ debt_report.summary.calculation_date|date_br }}</td>
               <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
               <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
               <td>Pagamentos: {{ debt_report.summary.total_paid|brl }}</td>

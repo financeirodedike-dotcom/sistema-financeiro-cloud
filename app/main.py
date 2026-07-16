@@ -46,7 +46,7 @@ def build_debt_row_summary(debt: Debt, position: dict) -> dict:
         "final_balance": position.get("current_balance", 0) or 0,
         "total_paid": total_paid,
         "periods": months_elapsed,
-        "reference": date.today(),
+        "reference": position.get("reference_date", date.today()),
     }
 
 
