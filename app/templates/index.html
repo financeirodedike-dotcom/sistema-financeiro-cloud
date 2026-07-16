@@ -187,7 +187,7 @@
     .debt-row { cursor: pointer; }
     .debt-row.is-selected td { background: #e0f2fe; }
     .print-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
-    .print-title { display: none; }
+    .print-title, .print-meta { display: none; }
     h2 { margin: 0 0 12px; color: var(--blue); font-size: 17px; letter-spacing: -.01em; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     th {
@@ -396,8 +396,11 @@
       body.print-debt-list #debt-summary-panel,
       body.print-debt-list #debt-table-panel,
       body.print-debt-evolution #debt-evolution-panel { display: block !important; }
-      .panel, .kpi { box-shadow: none; border: 1px solid #cbd5e1; break-inside: avoid; }
+      .panel { box-shadow: none; border: 0; padding: 0; break-inside: avoid; }
+      .kpi { box-shadow: none; border: 1px solid #cbd5e1; break-inside: avoid; }
+      .scroll { max-height: none !important; overflow: visible !important; border: 0 !important; }
       .print-title { display: block; margin: 0 0 12px; color: #12355b; font-size: 20px; }
+      .print-meta { display: block; margin: -6px 0 12px; color: #334155; font-size: 12px; }
       table { font-size: 10px; border-collapse: collapse; }
       th, td { padding: 5px 6px; border: 1px solid #cbd5e1; }
       th { background: #12355b !important; color: white !important; position: static; }
@@ -1915,8 +1918,8 @@
           <button type="button" onclick="printSection('debt-evolution')">Imprimir evolucao da divida</button>
         </div>
         <h1 class="print-title">Relatorio de evolucao da divida</h1>
-        <h2>Relatorio de evolucao da divida</h2>
-        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, pagamento e total a pagar.</p>
+        <h2 class="no-print">Relatorio de evolucao da divida</h2>
+        <p class="muted no-print">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, pagamento e total a pagar.</p>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="endividamento">
           <select name="debt_report">
@@ -1929,7 +1932,8 @@
           <button type="submit">Gerar evolucao</button>
         </form>
         {% if debt_report.debt %}
-        <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Calculado ate: {{ debt_report.summary.calculation_date|date_br }}.</p>
+        <p class="print-meta">{{ debt_report.debt.creditor }} | {{ debt_report.debt.interest_type }} | Calculado ate {{ debt_report.summary.calculation_date|date_br }}</p>
+        <p class="muted no-print">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Calculado ate: {{ debt_report.summary.calculation_date|date_br }}.</p>
         <details class="debt-edit payment-register">
           <summary>Registrar pagamento</summary>
           <form action="/debts/{{ debt_report.debt.id }}/payments" method="post">
