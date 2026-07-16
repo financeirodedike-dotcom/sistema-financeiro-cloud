@@ -752,7 +752,8 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         if period_month > reference_month:
             break
         period_end = min(period_due, reference_date)
-        days = max((period_end - period_start).days, 0)
+        actual_days = max((period_end - period_start).days, 0)
+        days = min(actual_days, 30) if period_due > reference_date else 30
         is_current_period = period_month == reference_month
         is_simple_interest = debt.interest_type == "Simples"
         opening_balance = capital if is_simple_interest else balance
