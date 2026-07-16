@@ -186,6 +186,8 @@
     .debt-summary-grid .kpi strong { font-size: 22px; }
     .debt-row { cursor: pointer; }
     .debt-row.is-selected td { background: #e0f2fe; }
+    .print-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+    .print-title { display: none; }
     h2 { margin: 0 0 12px; color: var(--blue); font-size: 17px; letter-spacing: -.01em; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     th {
@@ -383,6 +385,25 @@
       header { align-items: flex-start; flex-direction: column; }
       main { padding: 14px; }
       .grid, .two, .three, .debt-summary-grid, .pillar-grid, .module-grid, .roadmap-grid, .calendar-grid, .module-hub { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: white; color: #111827; }
+      header, .tabs, input[type="radio"], form, .print-actions, .pill, details, button, .no-print { display: none !important; }
+      main { padding: 0; }
+      .tab, #endividamento { display: block !important; }
+      body.print-debt-list .panel,
+      body.print-debt-evolution .panel { display: none !important; }
+      body.print-debt-list #debt-summary-panel,
+      body.print-debt-list #debt-table-panel,
+      body.print-debt-evolution #debt-evolution-panel { display: block !important; }
+      .panel, .kpi { box-shadow: none; border: 1px solid #cbd5e1; break-inside: avoid; }
+      .print-title { display: block; margin: 0 0 12px; color: #12355b; font-size: 20px; }
+      table { font-size: 10px; border-collapse: collapse; }
+      th, td { padding: 5px 6px; border: 1px solid #cbd5e1; }
+      th { background: #12355b !important; color: white !important; position: static; }
+      td { background: white !important; }
+      tr:nth-child(even) td { background: #f8fafc !important; }
+      @page { size: landscape; margin: 10mm; }
     }
   </style>
 </head>
@@ -1797,6 +1818,10 @@
         </form>
       </div>
       <div class="panel" id="debt-table-panel">
+        <div class="print-actions">
+          <button type="button" onclick="printSection('debt-list')">Imprimir endividamento</button>
+        </div>
+        <h1 class="print-title">Relatorio de endividamento</h1>
         <h2>Endividamento</h2>
         <table>
           <thead><tr><th>Data divida</th><th>Vencimento</th><th>Dias atraso</th><th>Tipo</th><th>Credor</th><th>Descricao</th><th>Capital original</th><th>Meses atual.</th><th>Juros acum.</th><th>Parcelas abatidas</th><th>Saldo atualizado</th><th>Juros</th><th>Parcela</th><th>Status</th><th>Relatorio</th><th>Editar</th></tr></thead>
@@ -1885,7 +1910,11 @@
           </tfoot>
         </table>
       </div>
-      <div class="panel">
+      <div class="panel" id="debt-evolution-panel">
+        <div class="print-actions">
+          <button type="button" onclick="printSection('debt-evolution')">Imprimir evolucao da divida</button>
+        </div>
+        <h1 class="print-title">Relatorio de evolucao da divida</h1>
         <h2>Relatorio de evolucao da divida</h2>
         <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, pagamento e total a pagar.</p>
         <form action="/" method="get">
@@ -2414,6 +2443,13 @@
       const net = Math.max(titleValue - totalCost, 0);
       document.getElementById("sim-result").textContent =
         `Custo estimado ${formatBRL(totalCost)} | Liquido estimado ${formatBRL(net)}`;
+    }
+
+    function printSection(section) {
+      const printClass = section === "debt-evolution" ? "print-debt-evolution" : "print-debt-list";
+      document.body.classList.add(printClass);
+      window.print();
+      window.setTimeout(() => document.body.classList.remove(printClass), 300);
     }
 
     const debtPanel = document.getElementById("debt-summary-panel");
