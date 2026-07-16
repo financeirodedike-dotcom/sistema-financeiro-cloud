@@ -1738,6 +1738,25 @@
 
     <section id="endividamento" class="tab">
       <div><a class="pill" href="/?tab=financeiro">Voltar ao modulo financeiro</a></div>
+      {% if debt_report.debt %}
+      <div class="panel">
+        <h2>Resumo da divida selecionada</h2>
+        <div class="debt-summary-grid">
+          <div class="kpi"><span>Total do emprestimo</span><strong>{{ debt_report.summary.total_loan|brl }}</strong></div>
+          <div class="kpi"><span>Capital</span><strong>{{ debt_report.summary.capital|brl }}</strong></div>
+          <div class="kpi"><span>Juros gerados</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
+          <div class="kpi"><span>Media de juros</span><strong class="negative">{{ debt_report.summary.average_interest|brl }}</strong></div>
+          <div class="kpi"><span>Juros mensais</span><strong class="negative">{{ debt_report.summary.monthly_interest|brl }}</strong></div>
+          <div class="kpi"><span>Valor a pagar</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
+        </div>
+        <div class="grid">
+          <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
+          <div class="kpi"><span>Juros pagos/abatidos</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
+          <div class="kpi"><span>Periodos calculados</span><strong>{{ debt_report.summary.rows_count }}</strong></div>
+          <div class="kpi"><span>Referencia</span><strong>{{ debt_report.summary.reference_date|date_br }}</strong></div>
+        </div>
+      </div>
+      {% endif %}
       <div class="panel">
         <h2>Novo emprestimo ou divida</h2>
         <form action="/debts" method="post">
@@ -1841,20 +1860,6 @@
           <button type="submit">Gerar evolucao</button>
         </form>
         {% if debt_report.debt %}
-        <div class="debt-summary-grid">
-          <div class="kpi"><span>Total do emprestimo</span><strong>{{ debt_report.summary.total_loan|brl }}</strong></div>
-          <div class="kpi"><span>Capital</span><strong>{{ debt_report.summary.capital|brl }}</strong></div>
-          <div class="kpi"><span>Juros gerados</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
-          <div class="kpi"><span>Media de juros</span><strong class="negative">{{ debt_report.summary.average_interest|brl }}</strong></div>
-          <div class="kpi"><span>Juros mensais</span><strong class="negative">{{ debt_report.summary.monthly_interest|brl }}</strong></div>
-          <div class="kpi"><span>Valor a pagar</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
-        </div>
-        <div class="grid">
-          <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
-          <div class="kpi"><span>Juros pagos/abatidos</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
-          <div class="kpi"><span>Periodos calculados</span><strong>{{ debt_report.summary.rows_count }}</strong></div>
-          <div class="kpi"><span>Referencia</span><strong>{{ debt_report.summary.reference_date|date_br }}</strong></div>
-        </div>
         <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Referencia: {{ debt_report.summary.reference_date|date_br }}.</p>
         <details class="debt-edit payment-register">
           <summary>Registrar pagamento</summary>
