@@ -349,6 +349,12 @@
     .debt-edit { margin-top: 8px; }
     .debt-edit summary { display: inline-block; padding: 7px 10px; border-radius: 6px; background: var(--blue); color: white; font-weight: 700; cursor: pointer; }
     .debt-edit form { margin-top: 8px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+    .checkline { display: flex; align-items: center; gap: 8px; color: var(--blue); font-weight: 800; }
+    .checkline input { width: auto; }
+    .payment-register { margin: 12px 0; }
+    .payment-register form { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 10px; align-items: end; }
+    .payment-register .wide { grid-column: 1 / -1; }
+    .payment-list { margin-top: 10px; }
     .split-box { margin-top: 8px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); min-width: 360px; }
     .split-line { display: grid; grid-template-columns: minmax(180px, 1fr) 120px; gap: 8px; width: 100%; }
     .split-list { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1820,7 +1826,7 @@
       </div>
       <div class="panel">
         <h2>Relatorio de evolucao da divida</h2>
-        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, credito liquido, pagamento e total a pagar.</p>
+        <p class="muted">Mostra a evolucao desde a data inicial da divida ate hoje, no mesmo formato da planilha: periodo, vencimento, dias, taxa, juros, pagamento e total a pagar.</p>
         <form action="/" method="get">
           <input type="hidden" name="tab" value="endividamento">
           <select name="debt_report">
@@ -1836,11 +1842,62 @@
         <div class="grid">
           <div class="kpi"><span>Credor</span><strong>{{ debt_report.debt.creditor }}</strong></div>
           <div class="kpi"><span>Total de juros</span><strong class="negative">{{ debt_report.summary.total_interest|brl }}</strong></div>
-          <div class="kpi"><span>Valor do credito</span><strong>{{ debt_report.summary.total_credit_value|brl }}</strong></div>
           <div class="kpi"><span>Total pago</span><strong class="positive">{{ debt_report.summary.total_paid|brl }}</strong></div>
           <div class="kpi"><span>A pagar hoje</span><strong class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</strong></div>
         </div>
         <p class="muted">Calculo para {{ debt_report.debt.creditor }} usando {{ debt_report.debt.interest_type }}. Referencia: {{ debt_report.summary.reference_date|date_br }}.</p>
+        <details class="debt-edit payment-register">
+          <summary>Registrar pagamento</summary>
+          <form action="/debts/{{ debt_report.debt.id }}/payments" method="post">
+            <input name="payment_date" placeholder="Data do pagamento dd/mm/aaaa" inputmode="numeric">
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="Valor pago" required>
+            <select name="account_id">
+              <option value="">Conta financeira para contabilizar</option>
+              {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}</option>
+              {% endfor %}
+            </select>
+            <select name="transaction_id" class="wide">
+              <option value="">Nao vincular OFX / criar manual se movimentar</option>
+              {% for tx in debt_link_transactions %}
+              <option value="{{ tx.id }}">{{ tx.date|date_br }} - {{ tx.history }} - {% if tx.saida %}{{ tx.saida|brl }}{% else %}{{ tx.entrada|brl }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <label class="checkline">
+              <input type="checkbox" name="move_to_accounting" value="1">
+              Movimentar tambem em Contabilizados
+            </label>
+            <input name="notes" class="wide" placeholder="Observacoes do pagamento">
+            <button type="submit">Salvar pagamento</button>
+          </form>
+          <p class="muted">Marcando a opcao acima, o sistema contabiliza o pagamento: se houver OFX vinculado, usa esse lancamento; se nao houver, cria um lancamento manual de saida. Sem marcar, o pagamento apenas reduz a evolucao da divida.</p>
+          {% if debt_report.debt.payments %}
+          <div class="scroll payment-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Valor</th>
+                  <th>Contabilizado</th>
+                  <th>OFX vinculado</th>
+                  <th>Observacoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for payment in debt_report.debt.payments %}
+                <tr>
+                  <td>{{ payment.payment_date|date_br }}</td>
+                  <td>{{ payment.amount|brl }}</td>
+                  <td>{{ "Sim" if payment.move_to_accounting else "Nao" }}</td>
+                  <td>{{ payment.transaction.history if payment.transaction else "-" }}</td>
+                  <td>{{ payment.notes or "-" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </details>
         <div class="scroll">
         <table class="debt-evolution-table">
           <thead>
@@ -1854,7 +1911,6 @@
               <th>Taxa</th>
               <th>Ao dia</th>
               <th>Total</th>
-              <th>Valor do credito</th>
               <th>Total a pagar</th>
               <th>Obs.</th>
             </tr>
@@ -1871,9 +1927,11 @@
               <td>{{ "%.2f"|format(row.rate_pct) }}%</td>
               <td>{{ row.daily_interest|brl }}</td>
               <td>{{ row.interest|brl }}</td>
-              <td>{{ row.credit_value|brl }}</td>
               <td class="{{ 'negative' if row.total_to_pay > 0 else 'positive' }}">{{ row.total_to_pay|brl }}</td>
-              <td>{{ row.period_note or row.payment_note or debt_report.debt.notes }}</td>
+              <td>
+                {{ row.period_note or row.payment_note or debt_report.debt.notes }}
+                {% if row.real_payment %}<br>Pagamento real: {{ row.real_payment|brl }}{% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1881,7 +1939,6 @@
             <tr>
               <td colspan="8">Totais ate {{ debt_report.summary.reference_date|date_br }}</td>
               <td class="negative">{{ debt_report.summary.total_interest|brl }}</td>
-              <td>{{ debt_report.summary.total_credit_value|brl }}</td>
               <td class="{{ 'negative' if debt_report.summary.final_balance > 0 else 'positive' }}">{{ debt_report.summary.final_balance|brl }}</td>
               <td>Pagamentos: {{ debt_report.summary.total_paid|brl }}</td>
             </tr>

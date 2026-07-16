@@ -96,6 +96,7 @@ def ensure_lightweight_migrations():
             ("import_batches", "CREATE INDEX IF NOT EXISTS idx_import_batches_company_created ON import_batches (company_id, created_at DESC)"),
             ("receivables", "CREATE INDEX IF NOT EXISTS idx_receivables_company_due ON receivables (company_id, due_date DESC)"),
             ("debts", "CREATE INDEX IF NOT EXISTS idx_debts_company_status_due ON debts (company_id, status, due_date)"),
+            ("debt_payments", "CREATE INDEX IF NOT EXISTS idx_debt_payments_debt_date ON debt_payments (debt_id, payment_date)"),
             ("anticipations", "CREATE INDEX IF NOT EXISTS idx_anticipations_company_created ON anticipations (company_id, created_at DESC)"),
         ]
         for table_name, statement in index_statements:

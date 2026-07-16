@@ -312,6 +312,31 @@ class Debt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
+    payments: Mapped[list["DebtPayment"]] = relationship(
+        back_populates="debt",
+        cascade="all, delete-orphan",
+        order_by="DebtPayment.payment_date.desc()",
+    )
+
+
+class DebtPayment(Base):
+    __tablename__ = "debt_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id"), index=True)
+    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("financial_accounts.id"), nullable=True)
+    payment_date: Mapped[date] = mapped_column(Date, index=True)
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    move_to_accounting: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    debt: Mapped[Debt] = relationship(back_populates="payments")
+    transaction: Mapped[Transaction | None] = relationship()
+    account: Mapped[FinancialAccount | None] = relationship()
 
 
 class Anticipation(Base):

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
+from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_account_info, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -830,7 +830,19 @@ def home(request: Request, db: Session = Depends(get_db)):
     }
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     current_user_membership = current_membership(user, company, db)
-    debts = db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+    debts = db.scalars(
+        select(Debt)
+        .where(Debt.company_id == company.id)
+        .options(selectinload(Debt.payments).selectinload(DebtPayment.transaction))
+        .order_by(Debt.created_at.desc())
+    ).all()
+    debt_link_transactions = db.scalars(
+        select(Transaction)
+        .where(Transaction.company_id == company.id)
+        .options(selectinload(Transaction.account))
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(250)
+    ).all()
     notes = db.scalars(
         select(CompanyNote).where(CompanyNote.company_id == company.id).order_by(CompanyNote.created_at.desc()).limit(5)
     ).all()
@@ -868,7 +880,11 @@ def home(request: Request, db: Session = Depends(get_db)):
     selected_debt = None
     if report_debt_id:
         try:
-            selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
+            selected_debt = db.scalar(
+                select(Debt)
+                .where(Debt.company_id == company.id, Debt.id == int(report_debt_id))
+                .options(selectinload(Debt.payments).selectinload(DebtPayment.transaction))
+            )
         except ValueError:
             selected_debt = None
     cashflow_report = monthly_cashflow(db, company.id, report_transactions)
@@ -919,6 +935,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "current_membership": current_user_membership,
             "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
+            "debt_link_transactions": debt_link_transactions,
             "notes": notes,
             "tasks": tasks,
             "control_agenda": control_agenda,
@@ -1161,8 +1178,24 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     }
     active_users = sum(1 for membership in user_memberships if membership.user.is_active)
     debts = (
-        db.scalars(select(Debt).where(Debt.company_id == company.id).order_by(Debt.created_at.desc())).all()
+        db.scalars(
+            select(Debt)
+            .where(Debt.company_id == company.id)
+            .options(selectinload(Debt.payments).selectinload(DebtPayment.transaction))
+            .order_by(Debt.created_at.desc())
+        ).all()
         if needs_debts
+        else []
+    )
+    debt_link_transactions = (
+        db.scalars(
+            select(Transaction)
+            .where(Transaction.company_id == company.id)
+            .options(selectinload(Transaction.account))
+            .order_by(Transaction.date.desc(), Transaction.id.desc())
+            .limit(250)
+        ).all()
+        if active_tab == "endividamento"
         else []
     )
     notes = (
@@ -1221,7 +1254,11 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     selected_debt = None
     if active_tab == "endividamento" and report_debt_id:
         try:
-            selected_debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == int(report_debt_id)))
+            selected_debt = db.scalar(
+                select(Debt)
+                .where(Debt.company_id == company.id, Debt.id == int(report_debt_id))
+                .options(selectinload(Debt.payments).selectinload(DebtPayment.transaction))
+            )
         except ValueError:
             selected_debt = None
 
@@ -1308,6 +1345,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             "current_membership": current_user_membership,
             "can_manage_access": can_manage_access(current_user_membership),
             "debts": debts,
+            "debt_link_transactions": debt_link_transactions,
             "notes": notes,
             "tasks": tasks,
             "control_agenda": control_agenda,
@@ -2003,6 +2041,92 @@ def update_debt(
         debt.notes = notes.strip()
         db.commit()
     return RedirectResponse("/?tab=endividamento", status_code=303)
+
+
+@app.post("/debts/{debt_id}/payments")
+def create_debt_payment(
+    request: Request,
+    debt_id: int,
+    payment_date: str = Form(""),
+    amount: float = Form(0),
+    account_id: str = Form(""),
+    transaction_id: str = Form(""),
+    move_to_accounting: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
+    if not debt or amount <= 0:
+        return RedirectResponse("/?tab=endividamento", status_code=303)
+
+    parsed_date = parse_filter_date(payment_date) or date.today()
+    should_move = move_to_accounting == "1"
+    account = None
+    if account_id:
+        try:
+            account = db.scalar(
+                select(FinancialAccount).where(
+                    FinancialAccount.company_id == company.id,
+                    FinancialAccount.id == int(account_id),
+                )
+            )
+        except ValueError:
+            account = None
+
+    linked_transaction = None
+    if transaction_id:
+        try:
+            linked_transaction = db.scalar(
+                select(Transaction).where(
+                    Transaction.company_id == company.id,
+                    Transaction.id == int(transaction_id),
+                )
+            )
+        except ValueError:
+            linked_transaction = None
+
+    if should_move:
+        if not account:
+            account = classify_account(db, company.id, f"Pagamento divida {debt.creditor} {debt.description}")
+        if linked_transaction:
+            create_full_transaction_split(db, company, linked_transaction, account)
+        else:
+            history = f"Pagamento divida - {debt.creditor}"
+            fingerprint = f"{company.id}|debt-payment|{debt.id}|{parsed_date.isoformat()}|{amount}|{debt.creditor}"
+            linked_transaction = Transaction(
+                company_id=company.id,
+                date=parsed_date,
+                history=history,
+                bank="Pagamento de divida",
+                fitid="debt-payment-" + hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
+                amount=-abs(amount),
+                entrada=0,
+                saida=abs(amount),
+                notes=notes.strip() or f"Pagamento registrado no endividamento: {debt.creditor}",
+                account=account,
+            )
+            db.add(linked_transaction)
+            db.flush()
+            create_full_transaction_split(db, company, linked_transaction, account)
+
+    db.add(
+        DebtPayment(
+            company_id=company.id,
+            debt_id=debt.id,
+            transaction_id=linked_transaction.id if linked_transaction else None,
+            account_id=account.id if account else None,
+            payment_date=parsed_date,
+            amount=amount,
+            move_to_accounting=should_move,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse(f"/?tab=endividamento&debt_report={debt.id}&debt_months=120", status_code=303)
 
 
 @app.post("/cashflow-plans")
