@@ -799,15 +799,24 @@ def debt_evolution(debt: Debt | None, months: int = 120, reference_date: date | 
         period_start = period_due
         period_due = add_months(period_due)
         period_month = add_months(period_month)
+    total_interest = sum(row["interest"] for row in rows)
+    total_paid = sum(row["installment"] for row in rows)
+    final_balance = rows[-1]["closing_balance"] if rows else capital
+    average_interest = total_interest / len(rows) if rows else 0
+    monthly_interest = capital * rate
     return {
         "debt": debt,
         "rows": rows,
         "months": months,
         "summary": {
             "reference_date": reference_date,
-            "total_interest": sum(row["interest"] for row in rows),
-            "total_paid": sum(row["installment"] for row in rows),
-            "final_balance": rows[-1]["closing_balance"] if rows else capital,
+            "capital": capital,
+            "total_loan": capital + total_interest,
+            "total_interest": total_interest,
+            "total_paid": total_paid,
+            "average_interest": average_interest,
+            "monthly_interest": monthly_interest,
+            "final_balance": final_balance,
             "rows_count": len(rows),
         },
     }
