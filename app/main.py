@@ -104,6 +104,49 @@ templates.env.filters["date_br"] = format_date_br
 templates.env.filters["month_br"] = format_month_br
 
 
+ADMIN_ROLES = {"owner", "admin"}
+MODULE_NONE = "__none__"
+MODULE_ACCESS = [
+    ("dashboard", "Centro de Controle"),
+    ("financeiro", "Financeiro"),
+    ("cadastros", "Cadastros"),
+    ("compras", "Compras"),
+    ("balanco", "Balanco"),
+    ("fiscal", "Fiscal"),
+    ("rh", "RH"),
+    ("vendas", "Vendas"),
+    ("marketing", "Marketing"),
+    ("producao", "Producao"),
+    ("mapa", "Mapa Empresarial 360"),
+    ("acessos", "Acessos e Usuarios"),
+]
+MODULE_KEYS = {key for key, _label in MODULE_ACCESS}
+TAB_MODULE_MAP = {
+    "dashboard": "dashboard",
+    "financeiro": "financeiro",
+    "extratos": "financeiro",
+    "contabilizados": "financeiro",
+    "classificacao": "financeiro",
+    "fluxo": "financeiro",
+    "conciliacao": "financeiro",
+    "dre": "financeiro",
+    "endividamento": "financeiro",
+    "contas-pagar": "financeiro",
+    "contas-receber": "financeiro",
+    "antecipacoes": "financeiro",
+    "cadastros": "cadastros",
+    "compras": "compras",
+    "balanco": "balanco",
+    "fiscal": "fiscal",
+    "rh": "rh",
+    "vendas": "vendas",
+    "marketing": "marketing",
+    "producao": "producao",
+    "mapa": "mapa",
+    "acessos": "acessos",
+}
+
+
 DEFAULT_ACCOUNTS = [
     ("A CLASSIFICAR", "Outras", "Outras Receitas/Despesas", "Operacional"),
     ("VENDA À VISTA", "Receitas", "Receita Bruta", "Operacional"),
@@ -713,7 +756,33 @@ def current_membership(user: User, company: Company, db: Session) -> Membership 
 
 
 def can_manage_access(membership: Membership | None) -> bool:
-    return bool(membership and membership.role in {"owner", "admin"})
+    return bool(membership and membership.role in ADMIN_ROLES)
+
+
+def enabled_module_keys(membership: Membership | None) -> set[str]:
+    if not membership:
+        return set()
+    if membership.role in ADMIN_ROLES:
+        return set(MODULE_KEYS)
+    raw_modules = (membership.enabled_modules or "").strip()
+    if not raw_modules:
+        return set(MODULE_KEYS)
+    if raw_modules == MODULE_NONE:
+        return set()
+    return {key for key in (item.strip() for item in raw_modules.split(",")) if key in MODULE_KEYS}
+
+
+def can_access_tab(membership: Membership | None, tab: str) -> bool:
+    module_key = TAB_MODULE_MAP.get(tab, tab)
+    return module_key in enabled_module_keys(membership)
+
+
+def first_accessible_tab(membership: Membership | None) -> str:
+    enabled = enabled_module_keys(membership)
+    for key, _label in MODULE_ACCESS:
+        if key in enabled:
+            return key
+    return "dashboard"
 
 
 @app.on_event("startup")
@@ -969,6 +1038,11 @@ def home(request: Request, db: Session = Depends(get_db)):
             "pending_count": pending_count,
             "imports": imports,
             "user_memberships": user_memberships,
+            "module_access": MODULE_ACCESS,
+            "enabled_modules": enabled_module_keys(current_user_membership),
+            "membership_module_map": {
+                membership.id: enabled_module_keys(membership) for membership in user_memberships
+            },
             "customers": customers,
             "suppliers": suppliers,
             "receivable_rows": receivable_rows,
@@ -1037,6 +1111,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         return context
     user, company = context
     seed_company_accounts(db, company)
+    current_user_membership = current_membership(user, company, db)
 
     valid_tabs = {
         "dashboard",
@@ -1067,6 +1142,8 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         active_tab = "fluxo"
     if active_tab not in valid_tabs:
         active_tab = "dashboard"
+    if not can_access_tab(current_user_membership, active_tab):
+        active_tab = first_accessible_tab(current_user_membership)
 
     report_tabs = {
         "dashboard",
@@ -1182,7 +1259,6 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         else []
     )
 
-    current_user_membership = current_membership(user, company, db)
     user_memberships = (
         db.scalars(
             select(Membership)
@@ -1752,6 +1828,28 @@ def update_access_user(
             membership.user.is_active = True
         if membership.user_id != user.id:
             membership.user.is_active = is_active == "on"
+        db.commit()
+    return RedirectResponse("/?tab=acessos", status_code=303)
+
+
+@app.post("/access/users/{membership_id}/modules")
+def update_access_modules(
+    request: Request,
+    membership_id: int,
+    modules: list[str] = Form(default=[]),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    user, company = context
+    operator_membership = current_membership(user, company, db)
+    if not can_manage_access(operator_membership):
+        return RedirectResponse("/?tab=acessos", status_code=303)
+    membership = db.scalar(select(Membership).where(Membership.company_id == company.id, Membership.id == membership_id))
+    if membership and membership.role not in ADMIN_ROLES:
+        selected_modules = [module for module in modules if module in MODULE_KEYS]
+        membership.enabled_modules = ",".join(selected_modules) if selected_modules else MODULE_NONE
         db.commit()
     return RedirectResponse("/?tab=acessos", status_code=303)
 

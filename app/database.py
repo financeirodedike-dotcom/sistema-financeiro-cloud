@@ -49,6 +49,11 @@ def ensure_lightweight_migrations():
     table_names = inspector.get_table_names()
 
     with engine.begin() as connection:
+        if "memberships" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("memberships")}
+            if "enabled_modules" not in existing_columns:
+                connection.execute(text("ALTER TABLE memberships ADD COLUMN enabled_modules TEXT DEFAULT ''"))
+
         if "debts" in table_names:
             existing_columns = {column["name"] for column in inspector.get_columns("debts")}
             new_columns = {

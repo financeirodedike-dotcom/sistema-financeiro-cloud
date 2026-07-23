@@ -39,6 +39,7 @@ class Membership(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     role: Mapped[str] = mapped_column(String(40), default="owner")
+    enabled_modules: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship(back_populates="memberships")
