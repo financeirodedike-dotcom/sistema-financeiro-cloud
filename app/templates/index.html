@@ -1893,6 +1893,9 @@
                     <input name="notes" value="{{ debt.notes }}">
                     <button type="submit">Salvar edicao</button>
                   </form>
+                  <form action="/debts/{{ debt.id }}/delete" method="post" onsubmit="return confirm('Excluir esta divida e seus pagamentos registrados? Esta acao nao pode ser desfeita.');">
+                    <button class="danger" type="submit">Excluir divida</button>
+                  </form>
                 </details>
               </td>
             </tr>

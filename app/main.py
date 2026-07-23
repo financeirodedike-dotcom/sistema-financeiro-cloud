@@ -2107,6 +2107,19 @@ def update_debt(
     return RedirectResponse("/?tab=endividamento", status_code=303)
 
 
+@app.post("/debts/{debt_id}/delete")
+def delete_debt(request: Request, debt_id: int, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    debt = db.scalar(select(Debt).where(Debt.company_id == company.id, Debt.id == debt_id))
+    if debt:
+        db.delete(debt)
+        db.commit()
+    return RedirectResponse("/?tab=endividamento", status_code=303)
+
+
 @app.post("/debts/{debt_id}/payments")
 def create_debt_payment(
     request: Request,
