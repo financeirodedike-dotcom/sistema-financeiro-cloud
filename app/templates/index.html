@@ -307,6 +307,20 @@
     .scroll { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); background: white; }
     .status { display: flex; gap: 8px; flex-wrap: wrap; }
     .pill { display: inline-block; background: var(--soft-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; font-size: 12px; color: var(--blue); text-decoration: none; }
+    .icon { width: 18px; height: 18px; flex: 0 0 18px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .module-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: var(--teal);
+      background: linear-gradient(145deg, rgba(15,118,110,.12), rgba(18,53,91,.06));
+      border: 1px solid rgba(15,118,110,.18);
+      margin-bottom: 10px;
+    }
+    .module-icon .icon { width: 20px; height: 20px; }
+    .tabs a .icon { margin-right: 7px; }
     .class-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .class-tabs button { background: var(--soft-2); color: var(--blue); border: 1px solid #cbd6e2; box-shadow: none; }
     .class-tabs button:hover { background: var(--blue); color: white; }
@@ -317,6 +331,7 @@
     a.module-card { display: block; color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
     a.module-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(18,53,91,.12); }
     .hero360 .pillar, .hero360 .module-card { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+    .hero360 .module-icon { color: #4cc9f0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); }
     .module-card strong, .pillar strong { display: block; color: var(--blue); margin-bottom: 6px; }
     .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
     .hero360 a.pillar { display: block; color: white; text-decoration: none; transition: transform .15s ease, background .15s ease; }
@@ -324,7 +339,8 @@
     .finance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
     .finance-tab { display: inline-flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--soft-2); color: var(--blue); border: 1px solid #cbd6e2; text-decoration: none; font-weight: 800; transition: transform .15s ease, background .15s ease; }
     .finance-tab:hover { background: var(--blue); color: white; transform: translateY(-1px); }
-    .finance-tab span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: rgba(15,118,110,.12); font-size: 12px; }
+    .finance-tab span { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: rgba(15,118,110,.12); font-size: 12px; color: var(--teal); }
+    .finance-tab:hover span { background: rgba(255,255,255,.16); color: white; }
     .status-ok { color: #157347; background: #dcfce7; border-color: #bbf7d0; }
     .status-pending { color: #9a6700; background: #fff8e6; border-color: #fde68a; }
     .insight { border-left: 4px solid #0f766e; background: #f0fdfa; }
@@ -411,6 +427,30 @@
   </style>
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute; overflow:hidden" aria-hidden="true" focusable="false">
+    <symbol id="icon-dashboard" viewBox="0 0 24 24"><path d="M4 13h6V4H4z"/><path d="M14 20h6V4h-6z"/><path d="M4 20h6v-3H4z"/></symbol>
+    <symbol id="icon-finance" viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M6 17V9"/><path d="M12 17V5"/><path d="M18 17v-6"/><path d="M3 9l9-5 9 5"/></symbol>
+    <symbol id="icon-registry" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="icon-cart" viewBox="0 0 24 24"><path d="M6 6h15l-2 8H8z"/><path d="M6 6 5 3H2"/><path d="M9 20h.01"/><path d="M18 20h.01"/></symbol>
+    <symbol id="icon-balance" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 6h14"/><path d="M6 6l-3 7h6z"/><path d="M18 6l-3 7h6z"/></symbol>
+    <symbol id="icon-fiscal" viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M10 13h6"/><path d="M10 17h4"/></symbol>
+    <symbol id="icon-rh" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></symbol>
+    <symbol id="icon-sales" viewBox="0 0 24 24"><path d="M20 12v8H4v-8"/><path d="M2 7h20v5H2z"/><path d="M12 7v13"/><path d="M12 7c-2 0-4-1-4-3 0-1 1-2 2-2 2 0 2 3 2 5z"/><path d="M12 7c2 0 4-1 4-3 0-1-1-2-2-2-2 0-2 3-2 5z"/></symbol>
+    <symbol id="icon-marketing" viewBox="0 0 24 24"><path d="M3 11v3a2 2 0 0 0 2 2h3l7 4V5L8 9H5a2 2 0 0 0-2 2z"/><path d="M18 9a4 4 0 0 1 0 6"/></symbol>
+    <symbol id="icon-production" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V9l5 3V9l5 3V7h4v14"/><path d="M9 17h1"/><path d="M14 17h1"/></symbol>
+    <symbol id="icon-map" viewBox="0 0 24 24"><path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="icon-statement" viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-4-2-3 2-3-2-4 2V5a2 2 0 0 1 2-2z"/><path d="M9 9h6"/><path d="M9 13h6"/></symbol>
+    <symbol id="icon-checkbook" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="m16 15 2 2 3-4"/></symbol>
+    <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20 13 11 22 2 13V4h9z"/><path d="M7 8h.01"/></symbol>
+    <symbol id="icon-cashflow" viewBox="0 0 24 24"><path d="M4 7h12"/><path d="m13 4 3 3-3 3"/><path d="M20 17H8"/><path d="m11 14-3 3 3 3"/></symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 3 5-7"/></symbol>
+    <symbol id="icon-debt" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h3"/></symbol>
+    <symbol id="icon-payable" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></symbol>
+    <symbol id="icon-receivable" viewBox="0 0 24 24"><path d="M12 21V3"/><path d="m7 16 5 5 5-5"/><path d="M5 3h14"/></symbol>
+    <symbol id="icon-anticipation" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M12 3l4 4-4 4"/><path d="M12 13l-4 4 4 4"/></symbol>
+    <symbol id="icon-reconcile" viewBox="0 0 24 24"><path d="m4 7 4 4 4-4"/><path d="M8 11V3"/><path d="m20 17-4-4-4 4"/><path d="M16 13v8"/></symbol>
+  </svg>
   <header>
     <div class="brand">
       <div class="brand-mark">360</div>
@@ -448,18 +488,18 @@
   <input id="tab-acessos" name="tab" type="radio" {% if active_tab == "acessos" %}checked{% endif %}>
 
   <nav class="tabs">
-    <a class="{{ 'active' if active_tab == 'dashboard' else '' }}" href="/?tab=dashboard">Centro de Controle</a>
-    <a class="{{ 'active' if active_tab == 'financeiro' else '' }}" href="/?tab=financeiro">Financeiro</a>
-    <a class="{{ 'active' if active_tab == 'cadastros' else '' }}" href="/?tab=cadastros">Cadastros</a>
-    <a class="{{ 'active' if active_tab == 'compras' else '' }}" href="/?tab=compras">Compras</a>
-    <a class="{{ 'active' if active_tab == 'balanco' else '' }}" href="/?tab=balanco">Balanco</a>
-    <a class="{{ 'active' if active_tab == 'fiscal' else '' }}" href="/?tab=fiscal">Fiscal</a>
-    <a class="{{ 'active' if active_tab == 'rh' else '' }}" href="/?tab=rh">RH</a>
-    <a class="{{ 'active' if active_tab == 'vendas' else '' }}" href="/?tab=vendas">Vendas</a>
-    <a class="{{ 'active' if active_tab == 'marketing' else '' }}" href="/?tab=marketing">Marketing</a>
-    <a class="{{ 'active' if active_tab == 'producao' else '' }}" href="/?tab=producao">Producao</a>
-    <a class="{{ 'active' if active_tab == 'mapa' else '' }}" href="/?tab=mapa">Mapa Empresarial 360</a>
-    <a class="{{ 'active' if active_tab == 'acessos' else '' }}" href="/?tab=acessos">Acessos e Usuarios</a>
+    <a class="{{ 'active' if active_tab == 'dashboard' else '' }}" href="/?tab=dashboard"><svg class="icon"><use href="#icon-dashboard"></use></svg>Centro de Controle</a>
+    <a class="{{ 'active' if active_tab == 'financeiro' else '' }}" href="/?tab=financeiro"><svg class="icon"><use href="#icon-finance"></use></svg>Financeiro</a>
+    <a class="{{ 'active' if active_tab == 'cadastros' else '' }}" href="/?tab=cadastros"><svg class="icon"><use href="#icon-registry"></use></svg>Cadastros</a>
+    <a class="{{ 'active' if active_tab == 'compras' else '' }}" href="/?tab=compras"><svg class="icon"><use href="#icon-cart"></use></svg>Compras</a>
+    <a class="{{ 'active' if active_tab == 'balanco' else '' }}" href="/?tab=balanco"><svg class="icon"><use href="#icon-balance"></use></svg>Balanco</a>
+    <a class="{{ 'active' if active_tab == 'fiscal' else '' }}" href="/?tab=fiscal"><svg class="icon"><use href="#icon-fiscal"></use></svg>Fiscal</a>
+    <a class="{{ 'active' if active_tab == 'rh' else '' }}" href="/?tab=rh"><svg class="icon"><use href="#icon-rh"></use></svg>RH</a>
+    <a class="{{ 'active' if active_tab == 'vendas' else '' }}" href="/?tab=vendas"><svg class="icon"><use href="#icon-sales"></use></svg>Vendas</a>
+    <a class="{{ 'active' if active_tab == 'marketing' else '' }}" href="/?tab=marketing"><svg class="icon"><use href="#icon-marketing"></use></svg>Marketing</a>
+    <a class="{{ 'active' if active_tab == 'producao' else '' }}" href="/?tab=producao"><svg class="icon"><use href="#icon-production"></use></svg>Producao</a>
+    <a class="{{ 'active' if active_tab == 'mapa' else '' }}" href="/?tab=mapa"><svg class="icon"><use href="#icon-map"></use></svg>Mapa Empresarial 360</a>
+    <a class="{{ 'active' if active_tab == 'acessos' else '' }}" href="/?tab=acessos"><svg class="icon"><use href="#icon-users"></use></svg>Acessos e Usuarios</a>
   </nav>
 
   <main>
@@ -626,17 +666,17 @@
       <div class="panel">
         <h2>Centro de Controle Integrado</h2>
         <div class="module-hub">
-          <a class="hub-card" href="/?tab=financeiro"><strong>Financeiro</strong><span>Resumo, extratos, classificacao, fluxo, DRE e dividas.</span></a>
-          <a class="hub-card" href="/?tab=cadastros"><strong>Cadastros</strong><span>Clientes e fornecedores centralizados para integrar vendas e compras.</span></a>
-          <a class="hub-card" href="/?tab=compras"><strong>Compras</strong><span>Compras, fornecedores e custos ligados ao caixa.</span></a>
-          <a class="hub-card" href="/?tab=fiscal"><strong>Fiscal</strong><span>XML, documentos fiscais e integracao contabil.</span></a>
-          <a class="hub-card" href="/?tab=rh"><strong>RH</strong><span>Colaboradores, EPIs, exames, ponto e ferias.</span></a>
-          <a class="hub-card" href="/?tab=vendas"><strong>Vendas</strong><span>Clientes, produtos e leitura comercial.</span></a>
-          <a class="hub-card" href="/?tab=marketing"><strong>Marketing</strong><span>Calendario, ROI e CAC.</span></a>
-          <a class="hub-card" href="/?tab=producao"><strong>Producao</strong><span>PCP, etapas, qualidade e entregas.</span></a>
-          <a class="hub-card" href="/?tab=balanco"><strong>Balanco</strong><span>Patrimonio, caixa, passivos e capital gerencial.</span></a>
-          <a class="hub-card" href="/?tab=mapa"><strong>Mapa 360</strong><span>Arquitetura da empresa e calendario executivo.</span></a>
-          <a class="hub-card" href="/?tab=acessos"><strong>Acessos</strong><span>Usuarios, perfis, status e redefinicao de senha.</span></a>
+          <a class="hub-card" href="/?tab=financeiro"><span class="module-icon"><svg class="icon"><use href="#icon-finance"></use></svg></span><strong>Financeiro</strong><span>Resumo, extratos, classificacao, fluxo, DRE e dividas.</span></a>
+          <a class="hub-card" href="/?tab=cadastros"><span class="module-icon"><svg class="icon"><use href="#icon-registry"></use></svg></span><strong>Cadastros</strong><span>Clientes e fornecedores centralizados para integrar vendas e compras.</span></a>
+          <a class="hub-card" href="/?tab=compras"><span class="module-icon"><svg class="icon"><use href="#icon-cart"></use></svg></span><strong>Compras</strong><span>Compras, fornecedores e custos ligados ao caixa.</span></a>
+          <a class="hub-card" href="/?tab=fiscal"><span class="module-icon"><svg class="icon"><use href="#icon-fiscal"></use></svg></span><strong>Fiscal</strong><span>XML, documentos fiscais e integracao contabil.</span></a>
+          <a class="hub-card" href="/?tab=rh"><span class="module-icon"><svg class="icon"><use href="#icon-rh"></use></svg></span><strong>RH</strong><span>Colaboradores, EPIs, exames, ponto e ferias.</span></a>
+          <a class="hub-card" href="/?tab=vendas"><span class="module-icon"><svg class="icon"><use href="#icon-sales"></use></svg></span><strong>Vendas</strong><span>Clientes, produtos e leitura comercial.</span></a>
+          <a class="hub-card" href="/?tab=marketing"><span class="module-icon"><svg class="icon"><use href="#icon-marketing"></use></svg></span><strong>Marketing</strong><span>Calendario, ROI e CAC.</span></a>
+          <a class="hub-card" href="/?tab=producao"><span class="module-icon"><svg class="icon"><use href="#icon-production"></use></svg></span><strong>Producao</strong><span>PCP, etapas, qualidade e entregas.</span></a>
+          <a class="hub-card" href="/?tab=balanco"><span class="module-icon"><svg class="icon"><use href="#icon-balance"></use></svg></span><strong>Balanco</strong><span>Patrimonio, caixa, passivos e capital gerencial.</span></a>
+          <a class="hub-card" href="/?tab=mapa"><span class="module-icon"><svg class="icon"><use href="#icon-map"></use></svg></span><strong>Mapa 360</strong><span>Arquitetura da empresa e calendario executivo.</span></a>
+          <a class="hub-card" href="/?tab=acessos"><span class="module-icon"><svg class="icon"><use href="#icon-users"></use></svg></span><strong>Acessos</strong><span>Usuarios, perfis, status e redefinicao de senha.</span></a>
         </div>
       </div>
       <div class="two">
@@ -820,44 +860,51 @@
       <div class="panel">
         <h2>Areas do financeiro</h2>
         <div class="finance-tabs">
-          <a class="finance-tab" href="/?tab=extratos"><span>01</span> Extratos</a>
-          <a class="finance-tab" href="/?tab=contabilizados"><span>02</span> Contabilizados</a>
-          <a class="finance-tab" href="/?tab=classificacao"><span>03</span> Classificacao</a>
-          <a class="finance-tab" href="/?tab=fluxo"><span>04</span> Fluxo de Caixa</a>
-          <a class="finance-tab" href="/?tab=dre"><span>05</span> DRE</a>
-          <a class="finance-tab" href="/?tab=endividamento"><span>06</span> Endividamento</a>
-          <a class="finance-tab" href="/?tab=contas-pagar"><span>07</span> Contas a Pagar</a>
-          <a class="finance-tab" href="/?tab=contas-receber"><span>08</span> Contas a Receber</a>
-          <a class="finance-tab" href="/?tab=antecipacoes"><span>09</span> Antecipacoes</a>
-          <a class="finance-tab" href="/?tab=conciliacao"><span>10</span> Conciliacao</a>
+          <a class="finance-tab" href="/?tab=extratos"><span><svg class="icon"><use href="#icon-statement"></use></svg></span> Extratos</a>
+          <a class="finance-tab" href="/?tab=contabilizados"><span><svg class="icon"><use href="#icon-checkbook"></use></svg></span> Contabilizados</a>
+          <a class="finance-tab" href="/?tab=classificacao"><span><svg class="icon"><use href="#icon-tag"></use></svg></span> Classificacao</a>
+          <a class="finance-tab" href="/?tab=fluxo"><span><svg class="icon"><use href="#icon-cashflow"></use></svg></span> Fluxo de Caixa</a>
+          <a class="finance-tab" href="/?tab=dre"><span><svg class="icon"><use href="#icon-chart"></use></svg></span> DRE</a>
+          <a class="finance-tab" href="/?tab=endividamento"><span><svg class="icon"><use href="#icon-debt"></use></svg></span> Endividamento</a>
+          <a class="finance-tab" href="/?tab=contas-pagar"><span><svg class="icon"><use href="#icon-payable"></use></svg></span> Contas a Pagar</a>
+          <a class="finance-tab" href="/?tab=contas-receber"><span><svg class="icon"><use href="#icon-receivable"></use></svg></span> Contas a Receber</a>
+          <a class="finance-tab" href="/?tab=antecipacoes"><span><svg class="icon"><use href="#icon-anticipation"></use></svg></span> Antecipacoes</a>
+          <a class="finance-tab" href="/?tab=conciliacao"><span><svg class="icon"><use href="#icon-reconcile"></use></svg></span> Conciliacao</a>
         </div>
         <p class="muted">Use esses botoes como abas internas do modulo financeiro.</p>
         <div class="module-grid">
           <a class="module-card" href="/?tab=extratos">
+            <span class="module-icon"><svg class="icon"><use href="#icon-statement"></use></svg></span>
             <strong>Extratos</strong>
             <span>Importe OFX, filtre por data, escolha banco/caixa e consulte o banco de dados de lancamentos.</span>
           </a>
           <a class="module-card" href="/?tab=contabilizados">
+            <span class="module-icon"><svg class="icon"><use href="#icon-checkbook"></use></svg></span>
             <strong>Contabilizados</strong>
             <span>Veja tudo que ja foi classificado, incluindo lancamentos rateados em mais de uma conta financeira.</span>
           </a>
           <a class="module-card" href="/?tab=classificacao">
+            <span class="module-icon"><svg class="icon"><use href="#icon-tag"></use></svg></span>
             <strong>Classificacao</strong>
             <span>Cadastre o plano de contas, grupos, linhas da DRE e regras automaticas por palavra-chave.</span>
           </a>
           <a class="module-card" href="/?tab=fluxo">
+            <span class="module-icon"><svg class="icon"><use href="#icon-cashflow"></use></svg></span>
             <strong>Fluxo de Caixa</strong>
             <span>Acompanhe entradas, saidas, saldo do mes e saldo acumulado por competencia.</span>
           </a>
           <a class="module-card" href="/?tab=conciliacao">
+            <span class="module-icon"><svg class="icon"><use href="#icon-reconcile"></use></svg></span>
             <strong>Conciliacao Bancaria</strong>
             <span>Informe saldo inicial e final do banco para validar se o caixa fecha.</span>
           </a>
           <a class="module-card" href="/?tab=dre">
+            <span class="module-icon"><svg class="icon"><use href="#icon-chart"></use></svg></span>
             <strong>DRE</strong>
             <span>Veja o resultado gerencial por linha financeira e identifique onde o lucro esta sendo formado.</span>
           </a>
           <a class="module-card" href="/?tab=endividamento">
+            <span class="module-icon"><svg class="icon"><use href="#icon-debt"></use></svg></span>
             <strong>Endividamento</strong>
             <span>Controle dividas, juros simples ou compostos, vencimentos, dias em atraso e evolucao mensal.</span>
           </a>
@@ -2309,15 +2356,15 @@
       <div class="panel">
         <h2>Modulos principais</h2>
         <div class="module-grid">
-          <a class="module-card" href="/?tab=financeiro"><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></a>
-          <a class="module-card" href="/?tab=cadastros"><strong>Cadastros Base</strong><span>Clientes, fornecedores, contatos, documentos e relacionamento.</span></a>
-          <a class="module-card" href="/?tab=rh"><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></a>
-          <a class="module-card" href="/?tab=producao"><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></a>
-          <a class="module-card" href="/?tab=compras"><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></a>
-          <a class="module-card" href="/?tab=vendas"><strong>Comercial/CRM</strong><span>Clientes, funil, propostas, vendas e margem.</span></a>
-          <a class="module-card" href="/?tab=fiscal"><strong>Fiscal</strong><span>NF-e, NFS-e, impostos, documentos e integracao contabil.</span></a>
-          <a class="module-card" href="/?tab=dashboard"><strong>Inteligencia</strong><span>Alertas criticos, recomendacoes e leitura dos dados.</span></a>
-          <a class="module-card" href="/?tab=acessos"><strong>Plataforma</strong><span>Usuarios, permissoes, auditoria, seguranca e API.</span></a>
+          <a class="module-card" href="/?tab=financeiro"><span class="module-icon"><svg class="icon"><use href="#icon-finance"></use></svg></span><strong>Financeiro Inteligente</strong><span>OFX, classificacao, fluxo de caixa, DRE, balanco e endividamento.</span></a>
+          <a class="module-card" href="/?tab=cadastros"><span class="module-icon"><svg class="icon"><use href="#icon-registry"></use></svg></span><strong>Cadastros Base</strong><span>Clientes, fornecedores, contatos, documentos e relacionamento.</span></a>
+          <a class="module-card" href="/?tab=rh"><span class="module-icon"><svg class="icon"><use href="#icon-rh"></use></svg></span><strong>RH Inteligente</strong><span>Colaboradores, cargos, desempenho, ponto e documentos.</span></a>
+          <a class="module-card" href="/?tab=producao"><span class="module-icon"><svg class="icon"><use href="#icon-production"></use></svg></span><strong>Producao</strong><span>Pedidos, etapas, qualidade, prazos e capacidade.</span></a>
+          <a class="module-card" href="/?tab=compras"><span class="module-icon"><svg class="icon"><use href="#icon-cart"></use></svg></span><strong>Compras & Estoque</strong><span>Fornecedores, compras, estoque minimo e giro.</span></a>
+          <a class="module-card" href="/?tab=vendas"><span class="module-icon"><svg class="icon"><use href="#icon-sales"></use></svg></span><strong>Comercial/CRM</strong><span>Clientes, funil, propostas, vendas e margem.</span></a>
+          <a class="module-card" href="/?tab=fiscal"><span class="module-icon"><svg class="icon"><use href="#icon-fiscal"></use></svg></span><strong>Fiscal</strong><span>NF-e, NFS-e, impostos, documentos e integracao contabil.</span></a>
+          <a class="module-card" href="/?tab=dashboard"><span class="module-icon"><svg class="icon"><use href="#icon-dashboard"></use></svg></span><strong>Inteligencia</strong><span>Alertas criticos, recomendacoes e leitura dos dados.</span></a>
+          <a class="module-card" href="/?tab=acessos"><span class="module-icon"><svg class="icon"><use href="#icon-users"></use></svg></span><strong>Plataforma</strong><span>Usuarios, permissoes, auditoria, seguranca e API.</span></a>
         </div>
       </div>
 
