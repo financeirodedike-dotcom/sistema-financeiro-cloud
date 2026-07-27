@@ -68,6 +68,40 @@ def parse_float_xml(value: str) -> float:
         return 0.0
 
 
+def join_xml_fields(*values: str) -> str:
+    return " - ".join(value for value in values if value)
+
+
+def nfe_address_text(parent) -> str:
+    address = xml_child(parent, "enderEmit") or xml_child(parent, "enderDest")
+    if address is None:
+        return ""
+    street = xml_text(address, "xLgr")
+    number = xml_text(address, "nro")
+    district = xml_text(address, "xBairro")
+    city = xml_text(address, "xMun")
+    state = xml_text(address, "UF")
+    cep = xml_text(address, "CEP")
+    return join_xml_fields(" ".join(part for part in [street, number] if part), district, f"{city}/{state}" if city or state else "", f"CEP {cep}" if cep else "")
+
+
+def nfe_phone(parent) -> str:
+    address = xml_child(parent, "enderEmit") or xml_child(parent, "enderDest")
+    return xml_text(address, "fone") if address is not None else ""
+
+
+def nfe_item_tax_code(det) -> str:
+    icms = xml_find_first(det, "ICMS")
+    if icms is None:
+        return ""
+    for group in list(icms):
+        cst = xml_text(group, "CST")
+        csosn = xml_text(group, "CSOSN")
+        if cst or csosn:
+            return cst or csosn
+    return ""
+
+
 def fiscal_document_from_xml(content: bytes, filename: str) -> dict:
     root = ElementTree.fromstring(content)
     inf = xml_find_first(root, "infNFe")
@@ -80,6 +114,13 @@ def fiscal_document_from_xml(content: bytes, filename: str) -> dict:
     emit = xml_child(inf, "emit")
     dest = xml_child(inf, "dest")
     total = xml_find_first(inf, "ICMSTot")
+    transp = xml_child(inf, "transp")
+    transporta = xml_child(transp, "transporta")
+    veic = xml_child(transp, "veicTransp")
+    vol = xml_child(transp, "vol")
+    cobr = xml_child(inf, "cobr")
+    inf_adic = xml_child(inf, "infAdic")
+    inf_prot = xml_find_first(root, "infProt")
     items = []
     for det in list(inf):
         if xml_local_name(det.tag) != "det":
@@ -92,22 +133,78 @@ def fiscal_document_from_xml(content: bytes, filename: str) -> dict:
             "description": xml_text(prod, "xProd"),
             "ncm": xml_text(prod, "NCM"),
             "cfop": xml_text(prod, "CFOP"),
+            "tax_code": nfe_item_tax_code(det),
             "unit": xml_text(prod, "uCom"),
             "quantity": xml_text(prod, "qCom"),
             "unit_value": parse_float_xml(xml_text(prod, "vUnCom")),
+            "discount": parse_float_xml(xml_text(prod, "vDesc")),
             "total": parse_float_xml(xml_text(prod, "vProd")),
         })
+    parcels = []
+    if cobr is not None:
+        for dup in list(cobr):
+            if xml_local_name(dup.tag) == "dup":
+                parcels.append(
+                    {
+                        "number": xml_text(dup, "nDup"),
+                        "due_date": parse_nfe_date(xml_text(dup, "dVenc")),
+                        "value": parse_float_xml(xml_text(dup, "vDup")),
+                    }
+                )
     return {
         "access_key": access_key or hashlib.sha256(content).hexdigest()[:44],
         "number": xml_text(ide, "nNF"),
         "series": xml_text(ide, "serie"),
         "issue_date": parse_nfe_date(xml_text(ide, "dhEmi") or xml_text(ide, "dEmi")),
+        "issue_time": (xml_text(ide, "dhEmi")[11:19] if xml_text(ide, "dhEmi") else ""),
+        "exit_date": parse_nfe_date(xml_text(ide, "dhSaiEnt") or xml_text(ide, "dSaiEnt")),
+        "exit_time": (xml_text(ide, "dhSaiEnt")[11:19] if xml_text(ide, "dhSaiEnt") else xml_text(ide, "hSaiEnt")),
         "operation": xml_text(ide, "natOp"),
         "model": xml_text(ide, "mod"),
+        "tp_nf": xml_text(ide, "tpNF"),
         "emitter_name": xml_text(emit, "xNome"),
         "emitter_document": xml_text(emit, "CNPJ") or xml_text(emit, "CPF"),
+        "emitter_address": nfe_address_text(emit),
+        "emitter_ie": xml_text(emit, "IE"),
+        "emitter_phone": nfe_phone(emit),
         "recipient_name": xml_text(dest, "xNome"),
         "recipient_document": xml_text(dest, "CNPJ") or xml_text(dest, "CPF"),
+        "recipient_address": nfe_address_text(dest),
+        "recipient_ie": xml_text(dest, "IE"),
+        "recipient_phone": nfe_phone(dest),
+        "protocol": join_xml_fields(xml_text(inf_prot, "nProt"), xml_text(inf_prot, "dhRecbto").replace("T", " ")[:19]),
+        "taxes": {
+            "vBC": parse_float_xml(xml_text(total, "vBC")),
+            "vICMS": parse_float_xml(xml_text(total, "vICMS")),
+            "vBCST": parse_float_xml(xml_text(total, "vBCST")),
+            "vST": parse_float_xml(xml_text(total, "vST")),
+            "vProd": parse_float_xml(xml_text(total, "vProd")),
+            "vFrete": parse_float_xml(xml_text(total, "vFrete")),
+            "vSeg": parse_float_xml(xml_text(total, "vSeg")),
+            "vDesc": parse_float_xml(xml_text(total, "vDesc")),
+            "vOutro": parse_float_xml(xml_text(total, "vOutro")),
+            "vIPI": parse_float_xml(xml_text(total, "vIPI")),
+            "vNF": parse_float_xml(xml_text(total, "vNF")),
+        },
+        "transport": {
+            "name": xml_text(transporta, "xNome"),
+            "document": xml_text(transporta, "CNPJ") or xml_text(transporta, "CPF"),
+            "address": xml_text(transporta, "xEnder"),
+            "city": xml_text(transporta, "xMun"),
+            "state": xml_text(transporta, "UF"),
+            "ie": xml_text(transporta, "IE"),
+            "freight_mode": xml_text(transp, "modFrete"),
+            "plate": xml_text(veic, "placa"),
+            "plate_state": xml_text(veic, "UF"),
+            "quantity": xml_text(vol, "qVol"),
+            "species": xml_text(vol, "esp"),
+            "brand": xml_text(vol, "marca"),
+            "numbering": xml_text(vol, "nVol"),
+            "gross_weight": xml_text(vol, "pesoB"),
+            "net_weight": xml_text(vol, "pesoL"),
+        },
+        "parcels": parcels,
+        "additional_info": xml_text(inf_adic, "infCpl"),
         "total_value": parse_float_xml(xml_text(total, "vNF")),
         "items": items,
         "filename": filename,
@@ -147,68 +244,310 @@ def build_danfe_pdf_bytes(summary: dict) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
+    from reportlab.graphics.barcode import code128
     from reportlab.pdfgen import canvas
 
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    margin = 10 * mm
-    y = height - margin
+    margin = 8 * mm
+    line_color = colors.HexColor("#315f5f")
+    light_fill = colors.HexColor("#f7fbfb")
+    title_fill = colors.HexColor("#eaf2f2")
+    page_w = width - 2 * margin
+    left = margin
+    top = height - margin
+    nf_number = str(summary.get("number") or "").zfill(9)
+    series = str(summary.get("series") or "")
+    access_key = str(summary.get("access_key") or "")
+    taxes = summary.get("taxes") or {}
+    transport = summary.get("transport") or {}
+    parcels = summary.get("parcels") or []
 
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(margin, y, "DANFE - Documento Auxiliar da Nota Fiscal Eletronica")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawRightString(width - margin, y, "Business360 AI")
+    def text_fit(value, limit=80):
+        text = str(value or "").replace("\n", " ").strip()
+        return text[:limit]
+
+    def money(value):
+        return format_brl(value).replace("R$ ", "")
+
+    def label_box(x, y, w, h, label, value="", font_size=7, align="left", fill=False, max_chars=80):
+        if fill:
+            pdf.setFillColor(light_fill)
+            pdf.rect(x, y, w, h, stroke=0, fill=1)
+        pdf.setStrokeColor(line_color)
+        pdf.rect(x, y, w, h, stroke=1, fill=0)
+        pdf.setFillColor(colors.HexColor("#244c4c"))
+        pdf.setFont("Helvetica-Bold", 5.5)
+        pdf.drawString(x + 2, y + h - 6, label.upper())
+        pdf.setFillColor(colors.black)
+        pdf.setFont("Helvetica", font_size)
+        value = text_fit(value, max_chars)
+        if align == "right":
+            pdf.drawRightString(x + w - 2, y + 3, value)
+        elif align == "center":
+            pdf.drawCentredString(x + w / 2, y + 3, value)
+        else:
+            pdf.drawString(x + 2, y + 3, value)
+
+    def section_title(y, title):
+        pdf.setFillColor(title_fill)
+        pdf.rect(left, y, page_w, 5 * mm, stroke=0, fill=1)
+        pdf.setStrokeColor(line_color)
+        pdf.rect(left, y, page_w, 5 * mm, stroke=1, fill=0)
+        pdf.setFillColor(colors.black)
+        pdf.setFont("Helvetica-Bold", 8)
+        pdf.drawString(left + 2, y + 1.5 * mm, title.upper())
+
+    def draw_centered_lines(x, y, w, lines, size=8, bold=False, leading=10):
+        pdf.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        current_y = y
+        for line in lines:
+            pdf.drawCentredString(x + w / 2, current_y, text_fit(line, 58))
+            current_y -= leading
+
+    def draw_small_table_row(y, columns, values, row_h=7 * mm, font_size=6):
+        x = left
+        for (label, col_w), value in zip(columns, values):
+            label_box(x, y, col_w, row_h, label, value, font_size=font_size, max_chars=45)
+            x += col_w
+
+    # Canhoto de recebimento
+    y = top - 14 * mm
+    label_box(left, y, page_w - 30 * mm, 14 * mm, "Recebemos de", f"{summary.get('emitter_name')} os produtos e/ou servicos constantes da NF-e indicada. Valor Total: {format_brl(summary.get('total_value'))}", 7, max_chars=140)
+    label_box(left + page_w - 30 * mm, y, 30 * mm, 14 * mm, "NF-e", f"No {nf_number}\nSerie {series}", 9, align="center")
+    y -= 10 * mm
+    label_box(left, y, 38 * mm, 9 * mm, "Data do recebimento", "")
+    label_box(left + 38 * mm, y, page_w - 38 * mm, 9 * mm, "Identificacao e assinatura do recebedor", "")
+    y -= 5 * mm
+    pdf.line(left, y, left + page_w, y)
+    y -= 6 * mm
+
+    # Cabecalho principal
+    header_h = 38 * mm
+    emit_w = 78 * mm
+    danfe_w = 30 * mm
+    key_w = page_w - emit_w - danfe_w
+    pdf.setStrokeColor(line_color)
+    pdf.rect(left, y - header_h, emit_w, header_h)
+    draw_centered_lines(
+        left,
+        y - 8 * mm,
+        emit_w,
+        [
+            summary.get("emitter_name", ""),
+            summary.get("emitter_address", ""),
+            f"Fone: {summary.get('emitter_phone', '')}" if summary.get("emitter_phone") else "",
+        ],
+        size=8,
+        bold=True,
+        leading=10,
+    )
+    pdf.rect(left + emit_w, y - header_h, danfe_w, header_h)
+    draw_centered_lines(
+        left + emit_w,
+        y - 6 * mm,
+        danfe_w,
+        [
+            "DANFE",
+            "Documento Auxiliar da",
+            "Nota Fiscal Eletronica",
+            f"{summary.get('tp_nf') or '1'} - SAIDA",
+            f"No {nf_number}",
+            f"Serie {series}",
+            "Folha 1/1",
+        ],
+        size=7,
+        bold=True,
+        leading=8,
+    )
+    key_x = left + emit_w + danfe_w
+    pdf.rect(key_x, y - header_h, key_w, header_h)
+    try:
+        barcode = code128.Code128(access_key, barHeight=12 * mm, barWidth=0.45)
+        barcode.drawOn(pdf, key_x + 5 * mm, y - 14 * mm)
+    except Exception:
+        pass
+    label_box(key_x, y - 24 * mm, key_w, 9 * mm, "Chave de acesso", access_key, 7, align="center", max_chars=60)
+    label_box(key_x, y - 33 * mm, key_w, 9 * mm, "Consulta de autenticidade", "www.nfe.fazenda.gov.br/portal ou site da Sefaz autorizadora", 6.5, align="center", max_chars=95)
+    y -= header_h
+
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Natureza da operacao", 105 * mm), ("Protocolo de autorizacao de uso", page_w - 105 * mm)],
+        [summary.get("operation", ""), summary.get("protocol", "")],
+        row_h=8 * mm,
+    )
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Inscricao estadual", 65 * mm), ("IE do substituto tributario", 65 * mm), ("CNPJ/CPF", page_w - 130 * mm)],
+        [summary.get("emitter_ie", ""), "", summary.get("emitter_document", "")],
+        row_h=8 * mm,
+    )
     y -= 12 * mm
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(margin, y, "Representacao auxiliar gerada a partir do XML importado. Consulte validade pela chave de acesso.")
-    y -= 7 * mm
 
-    draw_box(pdf, margin, y - 14 * mm, 120 * mm, 14 * mm, "CHAVE DE ACESSO", summary.get("access_key", ""))
-    draw_box(pdf, margin + 122 * mm, y - 14 * mm, 26 * mm, 14 * mm, "NF", summary.get("number", ""))
-    draw_box(pdf, margin + 150 * mm, y - 14 * mm, 20 * mm, 14 * mm, "SERIE", summary.get("series", ""))
-    draw_box(pdf, margin + 172 * mm, y - 14 * mm, 18 * mm, 14 * mm, "MODELO", summary.get("model", ""))
-    y -= 18 * mm
+    # Destinatario
+    section_title(y, "Destinatario / Remetente")
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Nome / Razao social", 125 * mm), ("CNPJ / CPF", 35 * mm), ("Data da emissao", page_w - 160 * mm)],
+        [summary.get("recipient_name", ""), summary.get("recipient_document", ""), format_date_br(summary.get("issue_date"))],
+        row_h=8 * mm,
+    )
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Endereco", 100 * mm), ("Telefone / Fax", 35 * mm), ("Inscricao estadual", 35 * mm), ("Data da saida", page_w - 170 * mm)],
+        [summary.get("recipient_address", ""), summary.get("recipient_phone", ""), summary.get("recipient_ie", ""), format_date_br(summary.get("exit_date"))],
+        row_h=8 * mm,
+    )
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Municipio / UF", 80 * mm), ("Hora da saida", 30 * mm), ("Arquivo XML", page_w - 110 * mm)],
+        [summary.get("recipient_address", ""), summary.get("exit_time", ""), summary.get("filename", "")],
+        row_h=8 * mm,
+    )
+    y -= 13 * mm
 
-    draw_box(pdf, margin, y - 16 * mm, 92 * mm, 16 * mm, "EMITENTE", f"{summary.get('emitter_name','')} - {summary.get('emitter_document','')}")
-    draw_box(pdf, margin + 96 * mm, y - 16 * mm, 94 * mm, 16 * mm, "DESTINATARIO", f"{summary.get('recipient_name','')} - {summary.get('recipient_document','')}")
-    y -= 20 * mm
+    # Parcelas
+    section_title(y, "Parcelas")
+    y -= 8 * mm
+    parcel_text = " | ".join(
+        f"{item.get('number') or ''} Venc. {format_date_br(item.get('due_date'))} Valor {format_brl(item.get('value'))}"
+        for item in parcels[:4]
+    ) or "Sem parcelas no XML"
+    label_box(left, y - 11 * mm, page_w, 11 * mm, "Numero / Vencimento / Valor", parcel_text, 7, max_chars=170)
+    y -= 16 * mm
 
-    draw_box(pdf, margin, y - 12 * mm, 70 * mm, 12 * mm, "NATUREZA DA OPERACAO", summary.get("operation", ""))
-    draw_box(pdf, margin + 72 * mm, y - 12 * mm, 45 * mm, 12 * mm, "DATA DE EMISSAO", format_date_br(summary.get("issue_date")))
-    draw_box(pdf, margin + 119 * mm, y - 12 * mm, 71 * mm, 12 * mm, "VALOR TOTAL DA NOTA", format_brl(summary.get("total_value")))
-    y -= 18 * mm
+    # Calculo do imposto
+    section_title(y, "Calculo do imposto")
+    y -= 8 * mm
+    tax_cols = [
+        ("Base calc. ICMS", 31 * mm),
+        ("Valor ICMS", 31 * mm),
+        ("Base calc. ICMS subst.", 38 * mm),
+        ("Valor ICMS subst.", 34 * mm),
+        ("Valor total produtos", page_w - 134 * mm),
+    ]
+    draw_small_table_row(
+        y - 8 * mm,
+        tax_cols,
+        [money(taxes.get("vBC")), money(taxes.get("vICMS")), money(taxes.get("vBCST")), money(taxes.get("vST")), money(taxes.get("vProd"))],
+        row_h=8 * mm,
+        font_size=7,
+    )
+    y -= 8 * mm
+    tax_cols_2 = [
+        ("Valor frete", 30 * mm),
+        ("Valor seguro", 30 * mm),
+        ("Desconto", 30 * mm),
+        ("Outras despesas acessorias", 45 * mm),
+        ("Valor IPI", 30 * mm),
+        ("Valor total da nota", page_w - 165 * mm),
+    ]
+    draw_small_table_row(
+        y - 8 * mm,
+        tax_cols_2,
+        [money(taxes.get("vFrete")), money(taxes.get("vSeg")), money(taxes.get("vDesc")), money(taxes.get("vOutro")), money(taxes.get("vIPI")), money(taxes.get("vNF"))],
+        row_h=8 * mm,
+        font_size=7,
+    )
+    y -= 13 * mm
 
-    pdf.setFillColor(colors.HexColor("#0b3557"))
-    pdf.rect(margin, y - 8 * mm, width - 2 * margin, 8 * mm, fill=1, stroke=0)
-    pdf.setFillColor(colors.white)
-    pdf.setFont("Helvetica-Bold", 7)
-    headers = [("COD", 0), ("DESCRICAO", 22), ("NCM", 108), ("CFOP", 130), ("QTD", 145), ("UN", 160), ("TOTAL", 174)]
-    for label, xpos in headers:
-        pdf.drawString(margin + xpos * mm, y - 5 * mm, label)
-    y -= 9 * mm
+    # Transporte
+    section_title(y, "Transportador / Volumes transportados")
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Nome / Razao social", 95 * mm), ("Frete por conta", 28 * mm), ("Placa", 25 * mm), ("UF", 12 * mm), ("CNPJ / CPF", page_w - 160 * mm)],
+        [transport.get("name"), transport.get("freight_mode"), transport.get("plate"), transport.get("plate_state"), transport.get("document")],
+        row_h=8 * mm,
+    )
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Endereco", 92 * mm), ("Municipio", 45 * mm), ("UF", 12 * mm), ("Inscricao estadual", page_w - 149 * mm)],
+        [transport.get("address"), transport.get("city"), transport.get("state"), transport.get("ie")],
+        row_h=8 * mm,
+    )
+    y -= 8 * mm
+    draw_small_table_row(
+        y - 8 * mm,
+        [("Quantidade", 22 * mm), ("Especie", 40 * mm), ("Marca", 45 * mm), ("Numeracao", 40 * mm), ("Peso bruto", 22 * mm), ("Peso liquido", page_w - 169 * mm)],
+        [transport.get("quantity"), transport.get("species"), transport.get("brand"), transport.get("numbering"), transport.get("gross_weight"), transport.get("net_weight")],
+        row_h=8 * mm,
+    )
+    y -= 13 * mm
+
+    # Produtos
+    section_title(y, "Dados dos produtos / servicos")
+    y -= 8 * mm
+    product_cols = [
+        ("Codigo", 18 * mm),
+        ("Descricao do produto / servico", 62 * mm),
+        ("NCM/SH", 15 * mm),
+        ("CST", 11 * mm),
+        ("CFOP", 12 * mm),
+        ("Unid.", 10 * mm),
+        ("Qtde.", 16 * mm),
+        ("Valor unit.", 18 * mm),
+        ("Valor desc.", 18 * mm),
+        ("Valor total", page_w - 180 * mm),
+    ]
+    pdf.setFillColor(title_fill)
+    pdf.rect(left, y - 7 * mm, page_w, 7 * mm, stroke=0, fill=1)
+    x = left
+    pdf.setStrokeColor(line_color)
     pdf.setFillColor(colors.black)
-    pdf.setFont("Helvetica", 7)
+    pdf.setFont("Helvetica-Bold", 5.2)
+    for label, col_w in product_cols:
+        pdf.rect(x, y - 7 * mm, col_w, 7 * mm)
+        pdf.drawCentredString(x + col_w / 2, y - 4.5 * mm, label.upper())
+        x += col_w
+    y -= 7 * mm
+    pdf.setFont("Helvetica", 5.5)
+    for item in (summary.get("items") or [])[:18]:
+        row_h = 7 * mm
+        x = left
+        values = [
+            item.get("code", ""),
+            item.get("description", ""),
+            item.get("ncm", ""),
+            item.get("tax_code", ""),
+            item.get("cfop", ""),
+            item.get("unit", ""),
+            item.get("quantity", ""),
+            money(item.get("unit_value")),
+            money(item.get("discount")),
+            money(item.get("total")),
+        ]
+        for idx, ((_, col_w), value) in enumerate(zip(product_cols, values)):
+            pdf.rect(x, y - row_h, col_w, row_h)
+            if idx in {6, 7, 8, 9}:
+                pdf.drawRightString(x + col_w - 1, y - 4.5 * mm, text_fit(value, 18))
+            else:
+                pdf.drawString(x + 1, y - 4.5 * mm, text_fit(value, 34))
+            x += col_w
+        y -= row_h
+    min_products_y = 54 * mm
+    if y > min_products_y:
+        pdf.setStrokeColor(line_color)
+        pdf.rect(left, min_products_y, page_w, y - min_products_y)
+        y = min_products_y
 
-    for item in summary.get("items", [])[:28]:
-        if y < 25 * mm:
-            pdf.showPage()
-            y = height - margin
-            pdf.setFont("Helvetica", 7)
-        pdf.line(margin, y, width - margin, y)
-        pdf.drawString(margin + 1 * mm, y - 5 * mm, str(item.get("code", ""))[:12])
-        pdf.drawString(margin + 22 * mm, y - 5 * mm, str(item.get("description", ""))[:58])
-        pdf.drawString(margin + 108 * mm, y - 5 * mm, str(item.get("ncm", ""))[:10])
-        pdf.drawString(margin + 130 * mm, y - 5 * mm, str(item.get("cfop", ""))[:6])
-        pdf.drawRightString(margin + 158 * mm, y - 5 * mm, str(item.get("quantity", ""))[:10])
-        pdf.drawString(margin + 161 * mm, y - 5 * mm, str(item.get("unit", ""))[:4])
-        pdf.drawRightString(width - margin - 2 * mm, y - 5 * mm, format_brl(item.get("total", 0)))
-        y -= 7 * mm
-
-    y -= 4 * mm
-    draw_box(pdf, margin, y - 18 * mm, width - 2 * margin, 18 * mm, "INFORMACOES COMPLEMENTARES", "DANFE gerado pelo Business360 AI a partir do XML armazenado no modulo Fiscal.")
-    pdf.setFont("Helvetica", 7)
-    pdf.drawString(margin, 8 * mm, "Este documento auxiliar nao substitui a NF-e. Consulte a autorizacao nos portais oficiais da SEFAZ pela chave de acesso.")
+    # Dados adicionais
+    section_title(y, "Dados adicionais")
+    y -= 8 * mm
+    info_h = 38 * mm
+    label_box(left, y - info_h, page_w * 0.67, info_h, "Informacoes complementares", summary.get("additional_info") or "DANFE gerado pelo Business360 AI a partir do XML importado.", 6.5, max_chars=300)
+    label_box(left + page_w * 0.67, y - info_h, page_w * 0.33, info_h, "Reservado ao fisco", "", 6.5)
+    pdf.setFont("Helvetica", 6.5)
+    pdf.setFillColor(colors.black)
+    pdf.drawString(left, 8 * mm, f"Data e hora da impressao: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    pdf.drawRightString(left + page_w, 8 * mm, "Emitido por Business360 AI")
     pdf.save()
     buffer.seek(0)
     return buffer.getvalue()
