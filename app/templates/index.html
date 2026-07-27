@@ -2133,16 +2133,20 @@
         <div class="panel">
           <h2>Leitor de XML e DANFE</h2>
           <form action="/fiscal/import-xml" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".xml" required>
-            <button type="submit">Importar XML e gerar DANFE</button>
+            <input type="file" name="files" accept=".xml" multiple required>
+            <button type="submit">Importar XMLs e gerar DANFE</button>
           </form>
           {% if request.query_params.get("xml_ok") %}
-          <p class="positive">XML importado com sucesso: {{ request.query_params.get("xml") }}</p>
+          <p class="positive">
+            XMLs processados: {{ request.query_params.get("xml_imported", 0) }} novos,
+            {{ request.query_params.get("xml_updated", 0) }} atualizados,
+            {{ request.query_params.get("xml_errors", 0) }} com erro.
+          </p>
           {% endif %}
           {% if request.query_params.get("xml_erro") %}
           <p class="negative">Nao foi possivel ler o XML como NF-e/NFC-e: {{ request.query_params.get("xml") }}</p>
           {% endif %}
-          <p class="muted">Ao importar novamente a mesma chave de acesso, o sistema atualiza a nota existente e evita duplicidade.</p>
+          <p class="muted">Voce pode selecionar varios arquivos XML de uma vez. Ao importar novamente a mesma chave de acesso, o sistema atualiza a nota existente e evita duplicidade.</p>
         </div>
         <div class="panel">
           <h2>Controles fiscais</h2>

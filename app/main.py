@@ -3039,39 +3039,54 @@ def download_anticipation_attachment(request: Request, attachment_id: int, db: S
 
 
 @app.post("/fiscal/import-xml")
-async def import_fiscal_xml(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_fiscal_xml(request: Request, files: list[UploadFile] = File(...), db: Session = Depends(get_db)):
     context = require_context(request, db)
     if isinstance(context, RedirectResponse):
         return context
     _user, company = context
-    filename = file.filename or "arquivo.xml"
-    try:
-        content = await file.read()
-        summary = fiscal_document_from_xml(content, filename)
-    except (ElementTree.ParseError, ValueError):
-        return RedirectResponse(f"/?tab=fiscal&xml_erro=1&xml={filename}", status_code=303)
+    imported = 0
+    updated = 0
+    errors = 0
+    last_filename = ""
+    for file in files:
+        filename = file.filename or "arquivo.xml"
+        last_filename = filename
+        try:
+            content = await file.read()
+            summary = fiscal_document_from_xml(content, filename)
+        except (ElementTree.ParseError, ValueError):
+            errors += 1
+            continue
 
-    document = db.scalar(
-        select(FiscalDocument).where(
-            FiscalDocument.company_id == company.id,
-            FiscalDocument.access_key == summary["access_key"],
+        document = db.scalar(
+            select(FiscalDocument).where(
+                FiscalDocument.company_id == company.id,
+                FiscalDocument.access_key == summary["access_key"],
+            )
         )
-    )
-    if not document:
-        document = FiscalDocument(company_id=company.id, access_key=summary["access_key"])
-        db.add(document)
-    document.number = summary["number"]
-    document.series = summary["series"]
-    document.issue_date = summary["issue_date"]
-    document.emitter_name = summary["emitter_name"]
-    document.emitter_document = summary["emitter_document"]
-    document.recipient_name = summary["recipient_name"]
-    document.recipient_document = summary["recipient_document"]
-    document.total_value = summary["total_value"]
-    document.xml_filename = filename
-    document.raw_xml = summary["raw_xml"]
+        if document:
+            updated += 1
+        else:
+            document = FiscalDocument(company_id=company.id, access_key=summary["access_key"])
+            db.add(document)
+            imported += 1
+        document.number = summary["number"]
+        document.series = summary["series"]
+        document.issue_date = summary["issue_date"]
+        document.emitter_name = summary["emitter_name"]
+        document.emitter_document = summary["emitter_document"]
+        document.recipient_name = summary["recipient_name"]
+        document.recipient_document = summary["recipient_document"]
+        document.total_value = summary["total_value"]
+        document.xml_filename = filename
+        document.raw_xml = summary["raw_xml"]
     db.commit()
-    return RedirectResponse(f"/?tab=fiscal&xml_ok=1&xml={filename}", status_code=303)
+    if imported or updated:
+        return RedirectResponse(
+            f"/?tab=fiscal&xml_ok=1&xml_imported={imported}&xml_updated={updated}&xml_errors={errors}",
+            status_code=303,
+        )
+    return RedirectResponse(f"/?tab=fiscal&xml_erro=1&xml={last_filename}&xml_errors={errors}", status_code=303)
 
 
 @app.get("/fiscal/documents/{document_id}/danfe")
