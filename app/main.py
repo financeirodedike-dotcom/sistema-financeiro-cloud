@@ -1,4 +1,5 @@
 import hashlib
+from io import BytesIO
 import re
 import unicodedata
 from datetime import date, datetime, timedelta
@@ -14,13 +15,203 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
+from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, FiscalDocument, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_account_info, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
 
 app = FastAPI(title="Business360 AI")
 templates = Jinja2Templates(directory="app/templates")
+
+
+def xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
+
+def xml_child(element, name: str):
+    if element is None:
+        return None
+    for child in list(element):
+        if xml_local_name(child.tag) == name:
+            return child
+    return None
+
+
+def xml_find_first(element, name: str):
+    if element is None:
+        return None
+    for child in element.iter():
+        if xml_local_name(child.tag) == name:
+            return child
+    return None
+
+
+def xml_text(element, *path: str) -> str:
+    current = element
+    for name in path:
+        current = xml_child(current, name)
+        if current is None:
+            return ""
+    return (current.text or "").strip()
+
+
+def parse_nfe_date(value: str) -> date | None:
+    if not value:
+        return None
+    return parse_filter_date(value[:10])
+
+
+def parse_float_xml(value: str) -> float:
+    try:
+        return float((value or "0").replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def fiscal_document_from_xml(content: bytes, filename: str) -> dict:
+    root = ElementTree.fromstring(content)
+    inf = xml_find_first(root, "infNFe")
+    if inf is None:
+        raise ValueError("XML de NF-e/NFC-e sem infNFe")
+    access_key = (inf.attrib.get("Id") or "").replace("NFe", "").strip()
+    if not access_key:
+        access_key = xml_text(root, "protNFe", "infProt", "chNFe")
+    ide = xml_child(inf, "ide")
+    emit = xml_child(inf, "emit")
+    dest = xml_child(inf, "dest")
+    total = xml_find_first(inf, "ICMSTot")
+    items = []
+    for det in list(inf):
+        if xml_local_name(det.tag) != "det":
+            continue
+        prod = xml_child(det, "prod")
+        if prod is None:
+            continue
+        items.append({
+            "code": xml_text(prod, "cProd"),
+            "description": xml_text(prod, "xProd"),
+            "ncm": xml_text(prod, "NCM"),
+            "cfop": xml_text(prod, "CFOP"),
+            "unit": xml_text(prod, "uCom"),
+            "quantity": xml_text(prod, "qCom"),
+            "unit_value": parse_float_xml(xml_text(prod, "vUnCom")),
+            "total": parse_float_xml(xml_text(prod, "vProd")),
+        })
+    return {
+        "access_key": access_key or hashlib.sha256(content).hexdigest()[:44],
+        "number": xml_text(ide, "nNF"),
+        "series": xml_text(ide, "serie"),
+        "issue_date": parse_nfe_date(xml_text(ide, "dhEmi") or xml_text(ide, "dEmi")),
+        "operation": xml_text(ide, "natOp"),
+        "model": xml_text(ide, "mod"),
+        "emitter_name": xml_text(emit, "xNome"),
+        "emitter_document": xml_text(emit, "CNPJ") or xml_text(emit, "CPF"),
+        "recipient_name": xml_text(dest, "xNome"),
+        "recipient_document": xml_text(dest, "CNPJ") or xml_text(dest, "CPF"),
+        "total_value": parse_float_xml(xml_text(total, "vNF")),
+        "items": items,
+        "filename": filename,
+        "raw_xml": content.decode("utf-8", errors="replace"),
+    }
+
+
+def fiscal_document_summary(document: FiscalDocument) -> dict:
+    summary = fiscal_document_from_xml(document.raw_xml.encode("utf-8"), document.xml_filename)
+    summary.update(
+        {
+            "access_key": document.access_key,
+            "number": document.number,
+            "series": document.series,
+            "issue_date": document.issue_date,
+            "emitter_name": document.emitter_name,
+            "emitter_document": document.emitter_document,
+            "recipient_name": document.recipient_name,
+            "recipient_document": document.recipient_document,
+            "total_value": document.total_value,
+            "filename": document.xml_filename,
+        }
+    )
+    return summary
+
+
+def draw_box(canvas, x, y, w, h, title, value=""):
+    canvas.rect(x, y, w, h)
+    canvas.setFont("Helvetica-Bold", 6)
+    canvas.drawString(x + 3, y + h - 8, title)
+    if value:
+        canvas.setFont("Helvetica", 8)
+        canvas.drawString(x + 3, y + 5, str(value)[:95])
+
+
+def build_danfe_pdf_bytes(summary: dict) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    margin = 10 * mm
+    y = height - margin
+
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(margin, y, "DANFE - Documento Auxiliar da Nota Fiscal Eletronica")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawRightString(width - margin, y, "Business360 AI")
+    y -= 12 * mm
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(margin, y, "Representacao auxiliar gerada a partir do XML importado. Consulte validade pela chave de acesso.")
+    y -= 7 * mm
+
+    draw_box(pdf, margin, y - 14 * mm, 120 * mm, 14 * mm, "CHAVE DE ACESSO", summary.get("access_key", ""))
+    draw_box(pdf, margin + 122 * mm, y - 14 * mm, 26 * mm, 14 * mm, "NF", summary.get("number", ""))
+    draw_box(pdf, margin + 150 * mm, y - 14 * mm, 20 * mm, 14 * mm, "SERIE", summary.get("series", ""))
+    draw_box(pdf, margin + 172 * mm, y - 14 * mm, 18 * mm, 14 * mm, "MODELO", summary.get("model", ""))
+    y -= 18 * mm
+
+    draw_box(pdf, margin, y - 16 * mm, 92 * mm, 16 * mm, "EMITENTE", f"{summary.get('emitter_name','')} - {summary.get('emitter_document','')}")
+    draw_box(pdf, margin + 96 * mm, y - 16 * mm, 94 * mm, 16 * mm, "DESTINATARIO", f"{summary.get('recipient_name','')} - {summary.get('recipient_document','')}")
+    y -= 20 * mm
+
+    draw_box(pdf, margin, y - 12 * mm, 70 * mm, 12 * mm, "NATUREZA DA OPERACAO", summary.get("operation", ""))
+    draw_box(pdf, margin + 72 * mm, y - 12 * mm, 45 * mm, 12 * mm, "DATA DE EMISSAO", format_date_br(summary.get("issue_date")))
+    draw_box(pdf, margin + 119 * mm, y - 12 * mm, 71 * mm, 12 * mm, "VALOR TOTAL DA NOTA", format_brl(summary.get("total_value")))
+    y -= 18 * mm
+
+    pdf.setFillColor(colors.HexColor("#0b3557"))
+    pdf.rect(margin, y - 8 * mm, width - 2 * margin, 8 * mm, fill=1, stroke=0)
+    pdf.setFillColor(colors.white)
+    pdf.setFont("Helvetica-Bold", 7)
+    headers = [("COD", 0), ("DESCRICAO", 22), ("NCM", 108), ("CFOP", 130), ("QTD", 145), ("UN", 160), ("TOTAL", 174)]
+    for label, xpos in headers:
+        pdf.drawString(margin + xpos * mm, y - 5 * mm, label)
+    y -= 9 * mm
+    pdf.setFillColor(colors.black)
+    pdf.setFont("Helvetica", 7)
+
+    for item in summary.get("items", [])[:28]:
+        if y < 25 * mm:
+            pdf.showPage()
+            y = height - margin
+            pdf.setFont("Helvetica", 7)
+        pdf.line(margin, y, width - margin, y)
+        pdf.drawString(margin + 1 * mm, y - 5 * mm, str(item.get("code", ""))[:12])
+        pdf.drawString(margin + 22 * mm, y - 5 * mm, str(item.get("description", ""))[:58])
+        pdf.drawString(margin + 108 * mm, y - 5 * mm, str(item.get("ncm", ""))[:10])
+        pdf.drawString(margin + 130 * mm, y - 5 * mm, str(item.get("cfop", ""))[:6])
+        pdf.drawRightString(margin + 158 * mm, y - 5 * mm, str(item.get("quantity", ""))[:10])
+        pdf.drawString(margin + 161 * mm, y - 5 * mm, str(item.get("unit", ""))[:4])
+        pdf.drawRightString(width - margin - 2 * mm, y - 5 * mm, format_brl(item.get("total", 0)))
+        y -= 7 * mm
+
+    y -= 4 * mm
+    draw_box(pdf, margin, y - 18 * mm, width - 2 * margin, 18 * mm, "INFORMACOES COMPLEMENTARES", "DANFE gerado pelo Business360 AI a partir do XML armazenado no modulo Fiscal.")
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(margin, 8 * mm, "Este documento auxiliar nao substitui a NF-e. Consulte a autorizacao nos portais oficiais da SEFAZ pela chave de acesso.")
+    pdf.save()
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def format_brl(value: float | int | None) -> str:
@@ -1164,6 +1355,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     needs_agenda = active_tab in {"dashboard", "mapa"}
     needs_anticipations = active_tab == "antecipacoes"
     needs_access = active_tab == "acessos"
+    needs_fiscal = active_tab == "fiscal"
 
     accounts = db.scalars(
         select(FinancialAccount).where(FinancialAccount.company_id == company.id).order_by(FinancialAccount.name)
@@ -1370,6 +1562,16 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         anticipation_cost(row.title_value or 0, row.title_fee_rate or 0, row.interest_rate or 0, row.iof_value or 0, row.costs_value or 0)
         for row in anticipations
     )
+    fiscal_documents = (
+        db.scalars(
+            select(FiscalDocument)
+            .where(FiscalDocument.company_id == company.id)
+            .order_by(FiscalDocument.issue_date.desc(), FiscalDocument.created_at.desc())
+            .limit(100)
+        ).all()
+        if needs_fiscal
+        else []
+    )
 
     debt_rows = []
     if active_tab == "endividamento":
@@ -1495,6 +1697,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
                 "cost_total": anticipation_total_cost,
                 "net_total": anticipation_total_titles - anticipation_total_cost,
             },
+            "fiscal_documents": fiscal_documents,
             "debt_rows": debt_rows,
             "debt_company_summary": debt_company_summary,
             "debt_report": debt_evolution(selected_debt, report_months),
@@ -2501,14 +2704,57 @@ async def import_fiscal_xml(request: Request, file: UploadFile = File(...), db: 
     context = require_context(request, db)
     if isinstance(context, RedirectResponse):
         return context
-    content = await file.read()
-    status = "xml_ok"
-    try:
-        ElementTree.fromstring(content)
-    except ElementTree.ParseError:
-        status = "xml_erro"
+    _user, company = context
     filename = file.filename or "arquivo.xml"
-    return RedirectResponse(f"/?tab=fiscal&{status}=1&xml={filename}", status_code=303)
+    try:
+        content = await file.read()
+        summary = fiscal_document_from_xml(content, filename)
+    except (ElementTree.ParseError, ValueError):
+        return RedirectResponse(f"/?tab=fiscal&xml_erro=1&xml={filename}", status_code=303)
+
+    document = db.scalar(
+        select(FiscalDocument).where(
+            FiscalDocument.company_id == company.id,
+            FiscalDocument.access_key == summary["access_key"],
+        )
+    )
+    if not document:
+        document = FiscalDocument(company_id=company.id, access_key=summary["access_key"])
+        db.add(document)
+    document.number = summary["number"]
+    document.series = summary["series"]
+    document.issue_date = summary["issue_date"]
+    document.emitter_name = summary["emitter_name"]
+    document.emitter_document = summary["emitter_document"]
+    document.recipient_name = summary["recipient_name"]
+    document.recipient_document = summary["recipient_document"]
+    document.total_value = summary["total_value"]
+    document.xml_filename = filename
+    document.raw_xml = summary["raw_xml"]
+    db.commit()
+    return RedirectResponse(f"/?tab=fiscal&xml_ok=1&xml={filename}", status_code=303)
+
+
+@app.get("/fiscal/documents/{document_id}/danfe")
+def download_fiscal_danfe(request: Request, document_id: int, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    document = db.scalar(
+        select(FiscalDocument).where(FiscalDocument.company_id == company.id, FiscalDocument.id == document_id)
+    )
+    if not document:
+        return RedirectResponse("/?tab=fiscal", status_code=303)
+    summary = fiscal_document_summary(document)
+    pdf_bytes = build_danfe_pdf_bytes(summary)
+    filename = f"danfe_{document.number or document.id}.pdf"
+    disposition = "inline" if request.query_params.get("print") == "1" else "attachment"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+    )
 
 
 @app.post("/transactions/{transaction_id}/classify")

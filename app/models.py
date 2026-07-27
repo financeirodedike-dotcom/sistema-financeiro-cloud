@@ -159,6 +159,28 @@ class TransactionSplit(Base):
     account: Mapped[FinancialAccount] = relationship(back_populates="transaction_splits")
 
 
+class FiscalDocument(Base):
+    __tablename__ = "fiscal_documents"
+    __table_args__ = (UniqueConstraint("company_id", "access_key", name="uq_fiscal_company_access_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    access_key: Mapped[str] = mapped_column(String(60), index=True)
+    number: Mapped[str] = mapped_column(String(40), default="")
+    series: Mapped[str] = mapped_column(String(20), default="")
+    issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    emitter_name: Mapped[str] = mapped_column(String(180), default="")
+    emitter_document: Mapped[str] = mapped_column(String(40), default="")
+    recipient_name: Mapped[str] = mapped_column(String(180), default="")
+    recipient_document: Mapped[str] = mapped_column(String(40), default="")
+    total_value: Mapped[float] = mapped_column(Float, default=0)
+    xml_filename: Mapped[str] = mapped_column(String(240), default="")
+    raw_xml: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+
+
 class BalanceAdjustment(Base):
     __tablename__ = "balance_adjustments"
     __table_args__ = (UniqueConstraint("company_id", "name", name="uq_balance_company_name"),)

@@ -2127,31 +2127,71 @@
     <section id="fiscal" class="tab">
       <div class="panel hero360">
         <h2>Fiscal</h2>
-        <p>Modulo fiscal para importacao de XML, organizacao de notas e integracao futura com apuracao e contabilidade.</p>
+        <p>Modulo fiscal para importacao de XML de NF-e/NFC-e, organizacao de notas e emissao de DANFE auxiliar para baixar ou imprimir.</p>
       </div>
       <div class="two">
         <div class="panel">
-          <h2>Leitor e importador de XML</h2>
+          <h2>Leitor de XML e DANFE</h2>
           <form action="/fiscal/import-xml" method="post" enctype="multipart/form-data">
             <input type="file" name="file" accept=".xml" required>
-            <button type="submit">Importar XML</button>
+            <button type="submit">Importar XML e gerar DANFE</button>
           </form>
           {% if request.query_params.get("xml_ok") %}
-          <p class="positive">XML lido com sucesso: {{ request.query_params.get("xml") }}</p>
+          <p class="positive">XML importado com sucesso: {{ request.query_params.get("xml") }}</p>
           {% endif %}
           {% if request.query_params.get("xml_erro") %}
-          <p class="negative">Nao foi possivel ler o XML: {{ request.query_params.get("xml") }}</p>
+          <p class="negative">Nao foi possivel ler o XML como NF-e/NFC-e: {{ request.query_params.get("xml") }}</p>
           {% endif %}
+          <p class="muted">Ao importar novamente a mesma chave de acesso, o sistema atualiza a nota existente e evita duplicidade.</p>
         </div>
         <div class="panel">
-          <h2>Controles fiscais planejados</h2>
+          <h2>Controles fiscais</h2>
           <div class="module-grid">
-            <div class="module-card"><strong>NF-e</strong><span>Entrada, saida, chave de acesso e fornecedor/cliente.</span></div>
-            <div class="module-card"><strong>NFS-e</strong><span>Servicos tomados e prestados.</span></div>
-            <div class="module-card"><strong>Impostos</strong><span>Simples Nacional, DAS, guias e vencimentos.</span></div>
-            <div class="module-card"><strong>Contabilidade</strong><span>Exportacao e integracao contabil.</span></div>
+            <div class="module-card"><strong>NF-e/NFC-e</strong><span>Leitura de chave, numero, emitente, destinatario, itens e totais.</span></div>
+            <div class="module-card"><strong>DANFE PDF</strong><span>Arquivo auxiliar pronto para baixar ou imprimir pelo navegador.</span></div>
+            <div class="module-card"><strong>Duplicidade</strong><span>Controle pela chave de acesso da nota fiscal.</span></div>
+            <div class="module-card"><strong>Proxima etapa</strong><span>Impostos, XML completo e integracao contabil.</span></div>
           </div>
         </div>
+      </div>
+      <div class="panel">
+        <h2>XMLs fiscais importados</h2>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Emissao</th>
+                <th>NF</th>
+                <th>Serie</th>
+                <th>Emitente</th>
+                <th>Destinatario</th>
+                <th>Valor</th>
+                <th>Chave</th>
+                <th>DANFE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for document in fiscal_documents %}
+              <tr>
+                <td>{{ document.issue_date|date_br }}</td>
+                <td>{{ document.number }}</td>
+                <td>{{ document.series }}</td>
+                <td>{{ document.emitter_name }}</td>
+                <td>{{ document.recipient_name }}</td>
+                <td>{{ document.total_value|brl }}</td>
+                <td><span class="muted">{{ document.access_key }}</span></td>
+                <td>
+                  <a class="pill" href="/fiscal/documents/{{ document.id }}/danfe">Baixar</a>
+                  <a class="pill" href="/fiscal/documents/{{ document.id }}/danfe?print=1" target="_blank">Imprimir</a>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8">Nenhum XML fiscal importado ainda.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">O PDF gerado e um DANFE auxiliar operacional baseado no XML. A validacao oficial continua sendo feita nos portais da SEFAZ pela chave de acesso.</p>
       </div>
     </section>
 
