@@ -2141,12 +2141,14 @@
             XMLs processados: {{ request.query_params.get("xml_imported", 0) }} novos,
             {{ request.query_params.get("xml_updated", 0) }} atualizados,
             {{ request.query_params.get("xml_errors", 0) }} com erro.
+            Cadastros sincronizados: {{ request.query_params.get("xml_suppliers", 0) }} fornecedores e
+            {{ request.query_params.get("xml_customers", 0) }} clientes.
           </p>
           {% endif %}
           {% if request.query_params.get("xml_erro") %}
           <p class="negative">Nao foi possivel ler o XML como NF-e/NFC-e: {{ request.query_params.get("xml") }}</p>
           {% endif %}
-          <p class="muted">Voce pode selecionar varios arquivos XML de uma vez. Ao importar novamente a mesma chave de acesso, o sistema atualiza a nota existente e evita duplicidade.</p>
+          <p class="muted">Voce pode selecionar varios arquivos XML de uma vez. Ao importar novamente a mesma chave de acesso, o sistema atualiza a nota existente, evita duplicidade e cadastra automaticamente emitente como fornecedor e destinatario como cliente.</p>
         </div>
         <div class="panel">
           <h2>Controles fiscais</h2>
@@ -2154,7 +2156,7 @@
             <div class="module-card"><strong>NF-e/NFC-e</strong><span>Leitura de chave, numero, emitente, destinatario, itens e totais.</span></div>
             <div class="module-card"><strong>DANFE PDF</strong><span>Arquivo auxiliar pronto para baixar ou imprimir pelo navegador.</span></div>
             <div class="module-card"><strong>Duplicidade</strong><span>Controle pela chave de acesso da nota fiscal.</span></div>
-            <div class="module-card"><strong>Proxima etapa</strong><span>Impostos, XML completo e integracao contabil.</span></div>
+            <div class="module-card"><strong>Cadastros automaticos</strong><span>Fornecedor e cliente criados ou atualizados pelo CNPJ/CPF do XML.</span></div>
           </div>
         </div>
       </div>

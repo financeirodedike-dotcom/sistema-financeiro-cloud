@@ -231,6 +231,55 @@ def fiscal_document_summary(document: FiscalDocument) -> dict:
     return summary
 
 
+def nfe_party_city_state(address_text: str) -> tuple[str, str]:
+    parts = [part.strip() for part in (address_text or "").split(" - ") if part.strip()]
+    for part in reversed(parts):
+        if "/" in part and not part.upper().startswith("CEP "):
+            city, state = part.rsplit("/", 1)
+            return city.strip(), state.strip().upper()
+    return "", ""
+
+
+def upsert_customer_from_nfe(db: Session, company: Company, summary: dict) -> bool:
+    document = (summary.get("recipient_document") or "").strip()
+    name = (summary.get("recipient_name") or "").strip()
+    if not document or not name:
+        return False
+    customer = db.scalar(select(Customer).where(Customer.company_id == company.id, Customer.document == document))
+    created = customer is None
+    if customer is None:
+        customer = Customer(company_id=company.id, document=document, status="Ativo")
+        db.add(customer)
+    city, state = nfe_party_city_state(summary.get("recipient_address", ""))
+    customer.name = name
+    customer.phone = (summary.get("recipient_phone") or customer.phone or "").strip()
+    customer.city = city or customer.city
+    customer.state = state or customer.state
+    customer.segment = customer.segment or "Cliente XML"
+    customer.notes = "Cadastro atualizado automaticamente pelo XML fiscal."
+    return created
+
+
+def upsert_supplier_from_nfe(db: Session, company: Company, summary: dict) -> bool:
+    document = (summary.get("emitter_document") or "").strip()
+    name = (summary.get("emitter_name") or "").strip()
+    if not document or not name:
+        return False
+    supplier = db.scalar(select(Supplier).where(Supplier.company_id == company.id, Supplier.document == document))
+    created = supplier is None
+    if supplier is None:
+        supplier = Supplier(company_id=company.id, document=document, status="Ativo")
+        db.add(supplier)
+    city, state = nfe_party_city_state(summary.get("emitter_address", ""))
+    supplier.name = name
+    supplier.phone = (summary.get("emitter_phone") or supplier.phone or "").strip()
+    supplier.city = city or supplier.city
+    supplier.state = state or supplier.state
+    supplier.category = supplier.category or "Fornecedor XML"
+    supplier.notes = "Cadastro atualizado automaticamente pelo XML fiscal."
+    return created
+
+
 def draw_box(canvas, x, y, w, h, title, value=""):
     canvas.rect(x, y, w, h)
     canvas.setFont("Helvetica-Bold", 6)
@@ -3047,6 +3096,8 @@ async def import_fiscal_xml(request: Request, files: list[UploadFile] = File(...
     imported = 0
     updated = 0
     errors = 0
+    customers_synced = 0
+    suppliers_synced = 0
     last_filename = ""
     for file in files:
         filename = file.filename or "arquivo.xml"
@@ -3080,10 +3131,18 @@ async def import_fiscal_xml(request: Request, files: list[UploadFile] = File(...
         document.total_value = summary["total_value"]
         document.xml_filename = filename
         document.raw_xml = summary["raw_xml"]
+        if upsert_supplier_from_nfe(db, company, summary):
+            suppliers_synced += 1
+        elif summary.get("emitter_document") and summary.get("emitter_name"):
+            suppliers_synced += 1
+        if upsert_customer_from_nfe(db, company, summary):
+            customers_synced += 1
+        elif summary.get("recipient_document") and summary.get("recipient_name"):
+            customers_synced += 1
     db.commit()
     if imported or updated:
         return RedirectResponse(
-            f"/?tab=fiscal&xml_ok=1&xml_imported={imported}&xml_updated={updated}&xml_errors={errors}",
+            f"/?tab=fiscal&xml_ok=1&xml_imported={imported}&xml_updated={updated}&xml_errors={errors}&xml_customers={customers_synced}&xml_suppliers={suppliers_synced}",
             status_code=303,
         )
     return RedirectResponse(f"/?tab=fiscal&xml_erro=1&xml={last_filename}&xml_errors={errors}", status_code=303)
