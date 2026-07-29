@@ -64,6 +64,15 @@
       font-size: 18px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.24);
     }
+    a.brand-mark {
+      color: white;
+      text-decoration: none;
+      transition: transform .15s ease, background .15s ease;
+    }
+    a.brand-mark:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(145deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
+    }
     header h1 { margin: 0; font-size: 25px; letter-spacing: .1px; }
     header small { display: block; margin-top: 2px; color: #dceaf6; font-weight: 500; }
     main {
@@ -458,7 +467,7 @@
   </svg>
   <header>
     <div class="brand">
-      <div class="brand-mark">360</div>
+      <a class="brand-mark" href="/?tab=dashboard" title="Voltar para a tela inicial">360</a>
       <div>
         <h1>Business360 AI</h1>
         <small>O copiloto inteligente da empresa | {{ company.name }} | Usuario: {{ user.name }}</small>
@@ -493,42 +502,18 @@
   <input id="tab-acessos" name="tab" type="radio" {% if active_tab == "acessos" %}checked{% endif %}>
 
   <nav class="tabs">
-    {% if "dashboard" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'dashboard' else '' }}" href="/?tab=dashboard"><svg class="icon"><use href="#icon-dashboard"></use></svg>Centro de Controle</a>
-    {% endif %}
-    {% if "financeiro" in enabled_modules %}
-    <a class="{{ 'active' if active_tab == 'financeiro' else '' }}" href="/?tab=financeiro"><svg class="icon"><use href="#icon-finance"></use></svg>Financeiro</a>
-    {% endif %}
-    {% if "cadastros" in enabled_modules %}
+    <a class="{{ 'active' if active_tab in ['financeiro', 'extratos', 'contabilizados', 'classificacao', 'fluxo', 'conciliacao', 'dre', 'endividamento', 'contas-pagar', 'contas-receber', 'antecipacoes'] else '' }}" href="/?tab=financeiro"><svg class="icon"><use href="#icon-finance"></use></svg>Financeiro</a>
     <a class="{{ 'active' if active_tab == 'cadastros' else '' }}" href="/?tab=cadastros"><svg class="icon"><use href="#icon-registry"></use></svg>Cadastros</a>
-    {% endif %}
-    {% if "compras" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'compras' else '' }}" href="/?tab=compras"><svg class="icon"><use href="#icon-cart"></use></svg>Compras</a>
-    {% endif %}
-    {% if "balanco" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'balanco' else '' }}" href="/?tab=balanco"><svg class="icon"><use href="#icon-balance"></use></svg>Balanco</a>
-    {% endif %}
-    {% if "fiscal" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'fiscal' else '' }}" href="/?tab=fiscal"><svg class="icon"><use href="#icon-fiscal"></use></svg>Fiscal</a>
-    {% endif %}
-    {% if "rh" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'rh' else '' }}" href="/?tab=rh"><svg class="icon"><use href="#icon-rh"></use></svg>RH</a>
-    {% endif %}
-    {% if "vendas" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'vendas' else '' }}" href="/?tab=vendas"><svg class="icon"><use href="#icon-sales"></use></svg>Vendas</a>
-    {% endif %}
-    {% if "marketing" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'marketing' else '' }}" href="/?tab=marketing"><svg class="icon"><use href="#icon-marketing"></use></svg>Marketing</a>
-    {% endif %}
-    {% if "producao" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'producao' else '' }}" href="/?tab=producao"><svg class="icon"><use href="#icon-production"></use></svg>Producao</a>
-    {% endif %}
-    {% if "mapa" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'mapa' else '' }}" href="/?tab=mapa"><svg class="icon"><use href="#icon-map"></use></svg>Mapa Empresarial 360</a>
-    {% endif %}
-    {% if "acessos" in enabled_modules %}
     <a class="{{ 'active' if active_tab == 'acessos' else '' }}" href="/?tab=acessos"><svg class="icon"><use href="#icon-users"></use></svg>Acessos e Usuarios</a>
-    {% endif %}
   </nav>
 
   <main>
