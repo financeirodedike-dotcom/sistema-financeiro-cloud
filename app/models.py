@@ -264,6 +264,71 @@ class Supplier(Base):
     company: Mapped[Company] = relationship()
 
 
+class Product(Base):
+    __tablename__ = "products"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    sku: Mapped[str] = mapped_column(String(80), default="")
+    description: Mapped[str] = mapped_column(String(220), index=True)
+    brand: Mapped[str] = mapped_column(String(120), default="")
+    unit: Mapped[str] = mapped_column(String(40), default="")
+    ncm: Mapped[str] = mapped_column(String(40), default="")
+    cost_value: Mapped[float] = mapped_column(Float, default=0)
+    sale_value: Mapped[float] = mapped_column(Float, default=0)
+    use_type: Mapped[str] = mapped_column(String(100), default="")
+    image_filename: Mapped[str] = mapped_column(String(240), default="")
+    image_content_type: Mapped[str] = mapped_column(String(120), default="")
+    image_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    technical_items: Mapped[list["ProductTechnicalItem"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductTechnicalItem.created_at.desc()",
+    )
+    cost_items: Mapped[list["ProductCostItem"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductCostItem.created_at.desc()",
+    )
+
+
+class ProductTechnicalItem(Base):
+    __tablename__ = "product_technical_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    component: Mapped[str] = mapped_column(String(180))
+    quantity: Mapped[float] = mapped_column(Float, default=0)
+    unit: Mapped[str] = mapped_column(String(40), default="")
+    loss_percent: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    product: Mapped[Product] = relationship(back_populates="technical_items")
+
+
+class ProductCostItem(Base):
+    __tablename__ = "product_cost_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    cost_type: Mapped[str] = mapped_column(String(80), default="Materia prima")
+    description: Mapped[str] = mapped_column(String(180))
+    value: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    product: Mapped[Product] = relationship(back_populates="cost_items")
+
+
 class Receivable(Base):
     __tablename__ = "receivables"
 

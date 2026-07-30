@@ -134,6 +134,7 @@
     #tab-fiscal:checked ~ .tabs label[for="tab-fiscal"],
     #tab-rh:checked ~ .tabs label[for="tab-rh"],
     #tab-vendas:checked ~ .tabs label[for="tab-vendas"],
+    #tab-estoque:checked ~ .tabs label[for="tab-estoque"],
     #tab-marketing:checked ~ .tabs label[for="tab-marketing"],
     #tab-producao:checked ~ .tabs label[for="tab-producao"],
     #tab-mapa:checked ~ .tabs label[for="tab-mapa"],
@@ -163,6 +164,7 @@
     #tab-fiscal:checked ~ main #fiscal,
     #tab-rh:checked ~ main #rh,
     #tab-vendas:checked ~ main #vendas,
+    #tab-estoque:checked ~ main #estoque,
     #tab-marketing:checked ~ main #marketing,
     #tab-producao:checked ~ main #producao,
     #tab-mapa:checked ~ main #mapa,
@@ -343,6 +345,9 @@
     .hero360 .module-icon { color: #4cc9f0; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); }
     .module-card strong, .pillar strong { display: block; color: var(--blue); margin-bottom: 6px; }
     .hero360 .module-card strong, .hero360 .pillar strong { color: #4cc9f0; }
+    .product-thumb { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); background: var(--soft-2); }
+    .product-card-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .product-card-main { display: flex; gap: 12px; align-items: center; min-width: 280px; }
     .hero360 a.pillar { display: block; color: white; text-decoration: none; transition: transform .15s ease, background .15s ease; }
     .hero360 a.pillar:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
     .finance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -450,6 +455,7 @@
     <symbol id="icon-fiscal" viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M10 13h6"/><path d="M10 17h4"/></symbol>
     <symbol id="icon-rh" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></symbol>
     <symbol id="icon-sales" viewBox="0 0 24 24"><path d="M20 12v8H4v-8"/><path d="M2 7h20v5H2z"/><path d="M12 7v13"/><path d="M12 7c-2 0-4-1-4-3 0-1 1-2 2-2 2 0 2 3 2 5z"/><path d="M12 7c2 0 4-1 4-3 0-1-1-2-2-2-2 0-2 3-2 5z"/></symbol>
+    <symbol id="icon-stock" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></symbol>
     <symbol id="icon-marketing" viewBox="0 0 24 24"><path d="M3 11v3a2 2 0 0 0 2 2h3l7 4V5L8 9H5a2 2 0 0 0-2 2z"/><path d="M18 9a4 4 0 0 1 0 6"/></symbol>
     <symbol id="icon-production" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V9l5 3V9l5 3V7h4v14"/><path d="M9 17h1"/><path d="M14 17h1"/></symbol>
     <symbol id="icon-map" viewBox="0 0 24 24"><path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></symbol>
@@ -496,6 +502,7 @@
   <input id="tab-fiscal" name="tab" type="radio" {% if active_tab == "fiscal" %}checked{% endif %}>
   <input id="tab-rh" name="tab" type="radio" {% if active_tab == "rh" %}checked{% endif %}>
   <input id="tab-vendas" name="tab" type="radio" {% if active_tab == "vendas" %}checked{% endif %}>
+  <input id="tab-estoque" name="tab" type="radio" {% if active_tab == "estoque" %}checked{% endif %}>
   <input id="tab-marketing" name="tab" type="radio" {% if active_tab == "marketing" %}checked{% endif %}>
   <input id="tab-producao" name="tab" type="radio" {% if active_tab == "producao" %}checked{% endif %}>
   <input id="tab-mapa" name="tab" type="radio" {% if active_tab == "mapa" %}checked{% endif %}>
@@ -510,6 +517,7 @@
     <a class="{{ 'active' if active_tab == 'fiscal' else '' }}" href="/?tab=fiscal"><svg class="icon"><use href="#icon-fiscal"></use></svg>Fiscal</a>
     <a class="{{ 'active' if active_tab == 'rh' else '' }}" href="/?tab=rh"><svg class="icon"><use href="#icon-rh"></use></svg>RH</a>
     <a class="{{ 'active' if active_tab == 'vendas' else '' }}" href="/?tab=vendas"><svg class="icon"><use href="#icon-sales"></use></svg>Vendas</a>
+    <a class="{{ 'active' if active_tab == 'estoque' else '' }}" href="/?tab=estoque"><svg class="icon"><use href="#icon-stock"></use></svg>Estoque</a>
     <a class="{{ 'active' if active_tab == 'marketing' else '' }}" href="/?tab=marketing"><svg class="icon"><use href="#icon-marketing"></use></svg>Marketing</a>
     <a class="{{ 'active' if active_tab == 'producao' else '' }}" href="/?tab=producao"><svg class="icon"><use href="#icon-production"></use></svg>Producao</a>
     <a class="{{ 'active' if active_tab == 'mapa' else '' }}" href="/?tab=mapa"><svg class="icon"><use href="#icon-map"></use></svg>Mapa Empresarial 360</a>
@@ -686,6 +694,7 @@
           <a class="hub-card" href="/?tab=fiscal"><span class="module-icon"><svg class="icon"><use href="#icon-fiscal"></use></svg></span><strong>Fiscal</strong><span>XML, documentos fiscais e integracao contabil.</span></a>
           <a class="hub-card" href="/?tab=rh"><span class="module-icon"><svg class="icon"><use href="#icon-rh"></use></svg></span><strong>RH</strong><span>Colaboradores, EPIs, exames, ponto e ferias.</span></a>
           <a class="hub-card" href="/?tab=vendas"><span class="module-icon"><svg class="icon"><use href="#icon-sales"></use></svg></span><strong>Vendas</strong><span>Clientes, produtos e leitura comercial.</span></a>
+          <a class="hub-card" href="/?tab=estoque"><span class="module-icon"><svg class="icon"><use href="#icon-stock"></use></svg></span><strong>Estoque</strong><span>Produtos, ficha tecnica, imagem e ficha de custo.</span></a>
           <a class="hub-card" href="/?tab=marketing"><span class="module-icon"><svg class="icon"><use href="#icon-marketing"></use></svg></span><strong>Marketing</strong><span>Calendario, ROI e CAC.</span></a>
           <a class="hub-card" href="/?tab=producao"><span class="module-icon"><svg class="icon"><use href="#icon-production"></use></svg></span><strong>Producao</strong><span>PCP, etapas, qualidade e entregas.</span></a>
           <a class="hub-card" href="/?tab=balanco"><span class="module-icon"><svg class="icon"><use href="#icon-balance"></use></svg></span><strong>Balanco</strong><span>Patrimonio, caixa, passivos e capital gerencial.</span></a>
@@ -2257,6 +2266,128 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="estoque" class="tab">
+      <div class="panel hero360">
+        <h2>Estoque</h2>
+        <p>Modulo para cadastrar produtos, anexar imagem, montar ficha tecnica e calcular a ficha de custo com materia prima, impostos, frete, mao de obra e comissao.</p>
+        <div class="pillar-grid">
+          <div class="pillar"><strong>Produtos</strong><span>{{ stock_summary.products }} cadastrados</span></div>
+          <div class="pillar"><strong>Itens tecnicos</strong><span>{{ stock_summary.technical_items }} composicoes</span></div>
+          <div class="pillar"><strong>Custo cadastrado</strong><span>{{ stock_summary.cost_total|brl }}</span></div>
+          <div class="pillar"><strong>Valor de venda</strong><span>{{ stock_summary.sale_total|brl }}</span></div>
+          <a class="pillar" href="/?tab=producao"><strong>Producao</strong><span>Integrar com PCP.</span></a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cadastro de produto</h2>
+        <form action="/stock/products" method="post" enctype="multipart/form-data">
+          <input name="sku" placeholder="Codigo/SKU">
+          <input name="description" placeholder="Descricao do produto" required>
+          <input name="brand" placeholder="Marca">
+          <input name="unit" placeholder="Unidade de medida">
+          <input name="ncm" placeholder="NCM">
+          <input type="number" step="0.01" name="cost_value" placeholder="Valor de custo">
+          <input type="number" step="0.01" name="sale_value" placeholder="Valor de venda">
+          <select name="use_type">
+            <option value="">Tipo de uso</option>
+            <option value="Produto acabado">Produto acabado</option>
+            <option value="Materia prima">Materia prima</option>
+            <option value="Revenda">Revenda</option>
+            <option value="Consumo interno">Consumo interno</option>
+            <option value="Servico">Servico</option>
+          </select>
+          <input type="file" name="image" accept="image/*">
+          <input name="notes" placeholder="Observacoes">
+          <button type="submit">Salvar produto</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Produtos cadastrados</h2>
+        <div class="scroll">
+          {% for row in product_rows %}
+          {% set product = row.product %}
+          <details class="module-card" {% if request.query_params.get("produto") == product.id|string %}open{% endif %}>
+            <summary class="product-card-head">
+              <span class="product-card-main">
+                {% if product.image_data %}
+                <img class="product-thumb" src="/stock/products/{{ product.id }}/image" alt="{{ product.description }}">
+                {% else %}
+                <span class="product-thumb"></span>
+                {% endif %}
+                <span>
+                  <strong>{{ product.description }}</strong>
+                  <span>{{ product.brand }}{% if product.ncm %} | NCM {{ product.ncm }}{% endif %} | {{ product.unit }}</span>
+                </span>
+              </span>
+              <span><strong>{{ product.sale_value|brl }}</strong><span>Custo ficha: {{ row.cost_total|brl }} | Margem: {{ row.margin|brl }}</span></span>
+            </summary>
+
+            <div class="grid" style="margin-top:12px;">
+              <div class="kpi"><span>Valor de custo</span><strong>{{ product.cost_value|brl }}</strong></div>
+              <div class="kpi"><span>Valor de venda</span><strong>{{ product.sale_value|brl }}</strong></div>
+              <div class="kpi"><span>Ficha de custo</span><strong>{{ row.cost_total|brl }}</strong></div>
+              <div class="kpi"><span>Composicao</span><strong>{{ row.technical_count }}</strong></div>
+            </div>
+
+            <div class="two" style="margin-top:12px;">
+              <div class="panel">
+                <h2>Ficha tecnica</h2>
+                <form action="/stock/products/{{ product.id }}/technical-items" method="post">
+                  <input name="component" placeholder="Componente / materia prima" required>
+                  <input type="number" step="0.0001" name="quantity" placeholder="Quantidade">
+                  <input name="unit" placeholder="Unidade">
+                  <input type="number" step="0.01" name="loss_percent" placeholder="% perda">
+                  <input name="notes" placeholder="Observacoes">
+                  <button type="submit">Adicionar composicao</button>
+                </form>
+                <table>
+                  <thead><tr><th>Componente</th><th>Qtd.</th><th>Un.</th><th>Perda</th><th>Obs.</th></tr></thead>
+                  <tbody>
+                    {% for item in product.technical_items %}
+                    <tr><td>{{ item.component }}</td><td>{{ item.quantity }}</td><td>{{ item.unit }}</td><td>{{ item.loss_percent }}%</td><td>{{ item.notes }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="panel">
+                <h2>Ficha de custo</h2>
+                <form action="/stock/products/{{ product.id }}/cost-items" method="post">
+                  <select name="cost_type">
+                    <option value="Materia prima">Materia prima</option>
+                    <option value="Impostos">Impostos</option>
+                    <option value="Frete">Frete</option>
+                    <option value="Mao de obra">Mao de obra</option>
+                    <option value="Comissao">Comissao</option>
+                    <option value="Embalagem">Embalagem</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                  <input name="description" placeholder="Descricao do custo" required>
+                  <input type="number" step="0.01" name="value" placeholder="Valor">
+                  <input name="notes" placeholder="Observacoes">
+                  <button type="submit">Adicionar custo</button>
+                </form>
+                <table>
+                  <thead><tr><th>Tipo</th><th>Descricao</th><th>Valor</th><th>Obs.</th></tr></thead>
+                  <tbody>
+                    {% for item in product.cost_items %}
+                    <tr><td>{{ item.cost_type }}</td><td>{{ item.description }}</td><td>{{ item.value|brl }}</td><td>{{ item.notes }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot><tr><td colspan="2">Total da ficha</td><td>{{ row.cost_total|brl }}</td><td>Margem: {{ row.margin|brl }}</td></tr></tfoot>
+                </table>
+              </div>
+            </div>
+          </details>
+          {% else %}
+          <p class="muted">Nenhum produto cadastrado ainda. Cadastre o primeiro produto acima para montar ficha tecnica e ficha de custo.</p>
+          {% endfor %}
         </div>
       </div>
     </section>

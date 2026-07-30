@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, FiscalDocument, ImportBatch, Membership, Receivable, Supplier, Transaction, TransactionSplit, User
+from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, FiscalDocument, ImportBatch, Membership, Product, ProductCostItem, ProductTechnicalItem, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_account_info, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -694,6 +694,7 @@ MODULE_ACCESS = [
     ("fiscal", "Fiscal"),
     ("rh", "RH"),
     ("vendas", "Vendas"),
+    ("estoque", "Estoque"),
     ("marketing", "Marketing"),
     ("producao", "Producao"),
     ("mapa", "Mapa Empresarial 360"),
@@ -719,6 +720,7 @@ TAB_MODULE_MAP = {
     "fiscal": "fiscal",
     "rh": "rh",
     "vendas": "vendas",
+    "estoque": "estoque",
     "marketing": "marketing",
     "producao": "producao",
     "mapa": "mapa",
@@ -1711,6 +1713,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         "fiscal",
         "rh",
         "vendas",
+        "estoque",
         "marketing",
         "producao",
         "mapa",
@@ -1738,6 +1741,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     needs_reports = active_tab in report_tabs
     needs_transactions = active_tab in {"extratos", "contabilizados", "contas-receber"}
     needs_registry = active_tab in {"dashboard", "cadastros", "compras", "vendas"}
+    needs_products = active_tab in {"dashboard", "vendas", "estoque", "producao"}
     needs_receivables = active_tab in {"dashboard", "contas-receber", "antecipacoes", "mapa"}
     needs_debts = active_tab in {"dashboard", "endividamento", "contas-pagar", "balanco", "mapa"}
     needs_agenda = active_tab in {"dashboard", "mapa"}
@@ -1859,6 +1863,28 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         if needs_registry
         else []
     )
+    products = (
+        db.scalars(
+            select(Product)
+            .where(Product.company_id == company.id)
+            .options(
+                selectinload(Product.technical_items),
+                selectinload(Product.cost_items),
+            )
+            .order_by(Product.created_at.desc())
+        ).all()
+        if needs_products
+        else []
+    )
+    product_rows = [
+        {
+            "product": product,
+            "technical_count": len(product.technical_items),
+            "cost_total": sum(item.value or 0 for item in product.cost_items),
+            "margin": (product.sale_value or 0) - sum(item.value or 0 for item in product.cost_items),
+        }
+        for product in products
+    ]
     receivables = (
         db.scalars(
             select(Receivable)
@@ -2057,6 +2083,14 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             "user_memberships": user_memberships,
             "customers": customers,
             "suppliers": suppliers,
+            "products": products,
+            "product_rows": product_rows,
+            "stock_summary": {
+                "products": len(products),
+                "technical_items": sum(len(row.technical_items) for row in products),
+                "cost_total": sum(row["cost_total"] for row in product_rows),
+                "sale_total": sum(row.sale_value or 0 for row in products),
+            },
             "receivable_rows": receivable_rows,
             "receivable_summary": receivable_summary,
             "registry_summary": {
@@ -2543,6 +2577,124 @@ def create_supplier(
     supplier.notes = notes.strip()
     db.commit()
     return RedirectResponse("/?tab=cadastros", status_code=303)
+
+
+@app.post("/stock/products")
+async def create_stock_product(
+    request: Request,
+    sku: str = Form(""),
+    description: str = Form(...),
+    brand: str = Form(""),
+    unit: str = Form(""),
+    ncm: str = Form(""),
+    cost_value: float = Form(0),
+    sale_value: float = Form(0),
+    use_type: str = Form(""),
+    notes: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    product = Product(
+        company_id=company.id,
+        sku=sku.strip(),
+        description=description.strip(),
+        brand=brand.strip(),
+        unit=unit.strip().upper(),
+        ncm=ncm.strip(),
+        cost_value=cost_value or 0,
+        sale_value=sale_value or 0,
+        use_type=use_type.strip(),
+        notes=notes.strip(),
+    )
+    if image and image.filename:
+        image_bytes = await image.read()
+        if image_bytes:
+            product.image_filename = image.filename
+            product.image_content_type = image.content_type or "application/octet-stream"
+            product.image_data = image_bytes
+    db.add(product)
+    db.commit()
+    return RedirectResponse("/?tab=estoque", status_code=303)
+
+
+@app.get("/stock/products/{product_id}/image")
+def stock_product_image(request: Request, product_id: int, db: Session = Depends(get_db)):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
+    if not product or not product.image_data:
+        return Response(status_code=404)
+    return Response(content=product.image_data, media_type=product.image_content_type or "application/octet-stream")
+
+
+@app.post("/stock/products/{product_id}/technical-items")
+def create_product_technical_item(
+    request: Request,
+    product_id: int,
+    component: str = Form(...),
+    quantity: float = Form(0),
+    unit: str = Form(""),
+    loss_percent: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
+    if not product:
+        return RedirectResponse("/?tab=estoque", status_code=303)
+    db.add(
+        ProductTechnicalItem(
+            company_id=company.id,
+            product_id=product.id,
+            component=component.strip(),
+            quantity=quantity or 0,
+            unit=unit.strip().upper(),
+            loss_percent=loss_percent or 0,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
+
+
+@app.post("/stock/products/{product_id}/cost-items")
+def create_product_cost_item(
+    request: Request,
+    product_id: int,
+    cost_type: str = Form("Materia prima"),
+    description: str = Form(...),
+    value: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
+    if not product:
+        return RedirectResponse("/?tab=estoque", status_code=303)
+    db.add(
+        ProductCostItem(
+            company_id=company.id,
+            product_id=product.id,
+            cost_type=cost_type.strip(),
+            description=description.strip(),
+            value=value or 0,
+            notes=notes.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
 
 
 @app.post("/receivables")
