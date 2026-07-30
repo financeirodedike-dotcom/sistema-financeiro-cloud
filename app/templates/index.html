@@ -2309,7 +2309,18 @@
 
       <div class="panel">
         <h2>Cadastro de produto</h2>
+        <datalist id="stock-group-options">
+          {% for group in product_groups %}
+          <option value="{{ group.name }}"></option>
+          {% endfor %}
+        </datalist>
+        <datalist id="stock-product-options">
+          {% for option_product in products %}
+          <option value="{{ option_product.id }} - {{ option_product.description }}"></option>
+          {% endfor %}
+        </datalist>
         <form action="/stock/products" method="post" enctype="multipart/form-data">
+          <input name="group_name" list="stock-group-options" placeholder="Grupo">
           <input name="sku" placeholder="Codigo/SKU">
           <input name="description" placeholder="Descricao do produto" required>
           <input name="brand" placeholder="Marca">
@@ -2332,6 +2343,23 @@
       </div>
 
       <div class="panel">
+        <h2>Cadastro de grupos do estoque</h2>
+        <p class="muted">Cadastre grupos para organizar produtos, materia-prima, revenda, kits, maquinas e familias de produto.</p>
+        <form action="/stock/groups" method="post">
+          <input name="name" placeholder="Nome do grupo" required>
+          <input name="notes" placeholder="Observacoes do grupo">
+          <button type="submit">Salvar grupo</button>
+        </form>
+        <div class="status" style="margin-top:10px;">
+          {% for group in product_groups %}
+          <span class="pill">{{ group.name }}</span>
+          {% else %}
+          <span class="muted">Nenhum grupo cadastrado ainda.</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
         <h2>Produtos cadastrados</h2>
         <div class="scroll">
           {% for row in product_rows %}
@@ -2346,7 +2374,7 @@
                 {% endif %}
                 <span>
                   <strong>{{ product.description }}</strong>
-                  <span>{{ product.brand }}{% if product.ncm %} | NCM {{ product.ncm }}{% endif %} | {{ product.unit }}</span>
+                  <span>{{ product.group.name if product.group else "Sem grupo" }} | {{ product.brand }}{% if product.ncm %} | NCM {{ product.ncm }}{% endif %} | {{ product.unit }}</span>
                 </span>
               </span>
               <span><strong>{{ product.sale_value|brl }}</strong><span>Custo ficha: {{ row.cost_total|brl }} | Margem: {{ row.margin|brl }}</span></span>
@@ -2362,6 +2390,7 @@
                   <label>ID / Descricao</label><div class="tech-readonly">{{ product.id }} | {{ product.description }}</div>
                   <label>Produto</label><div class="tech-readonly">{{ product.sku or "-" }} - {{ product.description }}</div>
                   <label>Nome comercial</label><div class="tech-readonly">{{ product.brand or product.description }}</div>
+                  <label>Grupo</label><div class="tech-readonly">{{ product.group.name if product.group else "Sem grupo" }}</div>
                   <label>Representante</label><div class="tech-readonly">{{ product.use_type or "Nao informado" }}</div>
                   <label>NCM / Unidade</label><div class="tech-readonly">{{ product.ncm or "-" }} | {{ product.unit or "-" }}</div>
                   <label>Qtde base</label><div class="tech-readonly">1 | Perda media dos materiais: {{ row.average_loss|round(2) }}%</div>
@@ -2402,6 +2431,10 @@
                 <h3>Editar produto cadastrado</h3>
                 <form action="/stock/products/{{ product.id }}/edit" method="post" enctype="multipart/form-data">
                   <label class="field-stack">
+                    <span>Grupo</span>
+                    <input name="group_name" list="stock-group-options" value="{{ product.group.name if product.group else '' }}" placeholder="Grupo">
+                  </label>
+                  <label class="field-stack">
                     <span>Codigo/SKU</span>
                     <input name="sku" value="{{ product.sku or '' }}" placeholder="Codigo/SKU">
                   </label>
@@ -2433,6 +2466,9 @@
                     <span>Tipo de uso</span>
                     <select name="use_type">
                       <option value="" {% if not product.use_type %}selected{% endif %}>Tipo de uso</option>
+                      <option value="Produto acabado" {% if product.use_type == "Produto acabado" %}selected{% endif %}>Produto acabado</option>
+                      <option value="Materia prima" {% if product.use_type == "Materia prima" %}selected{% endif %}>Materia prima</option>
+                      <option value="Revenda" {% if product.use_type == "Revenda" %}selected{% endif %}>Revenda</option>
                       <option value="Venda" {% if product.use_type == "Venda" %}selected{% endif %}>Venda</option>
                       <option value="Producao" {% if product.use_type == "Producao" %}selected{% endif %}>Producao</option>
                       <option value="Consumo interno" {% if product.use_type == "Consumo interno" %}selected{% endif %}>Consumo interno</option>
@@ -2454,7 +2490,8 @@
               <div class="tech-section">
                 <h3>Materiais - Ficha tecnica</h3>
                 <form action="/stock/products/{{ product.id }}/technical-items" method="post">
-                  <input name="component" placeholder="Componente / materia prima" required>
+                  <input name="component_product_ref" list="stock-product-options" placeholder="Buscar produto cadastrado">
+                  <input name="component" placeholder="Componente manual / materia prima">
                   <input type="number" step="0.0001" name="quantity" placeholder="Quantidade">
                   <input name="unit" placeholder="Unidade">
                   <input type="number" step="0.01" name="loss_percent" placeholder="% perda">
@@ -2466,8 +2503,8 @@
                   <tbody>
                     {% for item in product.technical_items %}
                     <tr>
-                      <td>Material</td>
-                      <td>{{ item.component }}</td>
+                      <td>{{ "Produto cadastrado" if item.component_product else "Material" }}</td>
+                      <td>{{ item.component }}{% if item.component_product %} <span class="pill">ID {{ item.component_product.id }}</span>{% endif %}</td>
                       <td>{{ item.quantity }}</td>
                       <td>{{ item.unit }}</td>
                       <td>{{ item.loss_percent }}%</td>
@@ -2479,7 +2516,8 @@
                         <details class="inline-edit">
                           <summary>Editar material da ficha tecnica</summary>
                           <form action="/stock/technical-items/{{ item.id }}/edit" method="post">
-                            <input name="component" value="{{ item.component }}" placeholder="Componente / materia prima" required>
+                            <input name="component_product_ref" list="stock-product-options" value="{{ item.component_product.id ~ ' - ' ~ item.component_product.description if item.component_product else '' }}" placeholder="Buscar produto cadastrado">
+                            <input name="component" value="{{ item.component }}" placeholder="Componente manual / materia prima">
                             <input type="number" step="0.0001" name="quantity" value="{{ item.quantity or 0 }}" placeholder="Quantidade">
                             <input name="unit" value="{{ item.unit or '' }}" placeholder="Unidade">
                             <input type="number" step="0.01" name="loss_percent" value="{{ item.loss_percent or 0 }}" placeholder="% perda">
@@ -2499,6 +2537,7 @@
               <div class="tech-section">
                 <h3>Custos - Ficha de custo</h3>
                 <form action="/stock/products/{{ product.id }}/cost-items" method="post">
+                  <input name="cost_product_ref" list="stock-product-options" placeholder="Buscar produto cadastrado">
                   <select name="cost_type">
                     <option value="Materia prima">Materia prima</option>
                     <option value="Impostos">Impostos</option>
@@ -2508,7 +2547,7 @@
                     <option value="Embalagem">Embalagem</option>
                     <option value="Outros">Outros</option>
                   </select>
-                  <input name="description" placeholder="Descricao do custo" required>
+                  <input name="description" placeholder="Descricao do custo manual">
                   <input type="number" step="0.01" name="value" placeholder="Valor">
                   <input name="notes" placeholder="Observacoes">
                   <button type="submit">Adicionar custo</button>
@@ -2523,12 +2562,13 @@
                         <details class="inline-edit">
                           <summary>Editar custo da ficha</summary>
                           <form action="/stock/cost-items/{{ item.id }}/edit" method="post">
+                            <input name="cost_product_ref" list="stock-product-options" placeholder="Buscar produto cadastrado">
                             <select name="cost_type">
                               {% for option in ["Materia prima", "Impostos", "Frete", "Mao de obra", "Comissao", "Embalagem", "Outros"] %}
                               <option value="{{ option }}" {% if item.cost_type == option %}selected{% endif %}>{{ option }}</option>
                               {% endfor %}
                             </select>
-                            <input name="description" value="{{ item.description }}" placeholder="Descricao do custo" required>
+                            <input name="description" value="{{ item.description }}" placeholder="Descricao do custo manual">
                             <input type="number" step="0.01" name="value" value="{{ item.value or 0 }}" placeholder="Valor">
                             <input name="notes" value="{{ item.notes or '' }}" placeholder="Observacoes">
                             <button type="submit">Salvar custo</button>

@@ -8,14 +8,14 @@ from xml.etree import ElementTree
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import SESSION_COOKIE, create_session_token, current_company, current_user, hash_password, verify_password
 from app.classifier import classify_account
 from app.database import get_db, init_db
-from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, FiscalDocument, ImportBatch, Membership, Product, ProductCostItem, ProductTechnicalItem, Receivable, Supplier, Transaction, TransactionSplit, User
+from app.models import Anticipation, AnticipationAttachment, BankAccount, BankReconciliation, CashflowPlan, ClassificationRule, Company, CompanyNote, CompanyTask, Customer, Debt, DebtPayment, FinancialAccount, FiscalDocument, ImportBatch, Membership, Product, ProductCostItem, ProductGroup, ProductTechnicalItem, Receivable, Supplier, Transaction, TransactionSplit, User
 from app.ofx_parser import parse_ofx, parse_ofx_account_info, parse_ofx_balances
 from app.reports import balance_sheet, bank_reconciliation_report, cashflow_diagnostics, cashflow_matrix, current_debt_position, dashboard, dashboard_charts, debt_evolution, dre, monthly_cashflow, planned_cashflow, purchases
 
@@ -278,6 +278,42 @@ def upsert_supplier_from_nfe(db: Session, company: Company, summary: dict) -> bo
     supplier.category = supplier.category or "Fornecedor XML"
     supplier.notes = "Cadastro atualizado automaticamente pelo XML fiscal."
     return created
+
+
+def get_or_create_product_group(db: Session, company_id: int, group_name: str) -> ProductGroup | None:
+    clean_name = " ".join((group_name or "").strip().split())
+    if not clean_name:
+        return None
+    group = db.scalar(
+        select(ProductGroup).where(
+            ProductGroup.company_id == company_id,
+            func.lower(ProductGroup.name) == clean_name.lower(),
+        )
+    )
+    if group:
+        return group
+    group = ProductGroup(company_id=company_id, name=clean_name)
+    db.add(group)
+    db.flush()
+    return group
+
+
+def resolve_component_product(db: Session, company_id: int, component_product_ref: str, parent_product_id: int) -> Product | None:
+    clean_ref = (component_product_ref or "").strip()
+    if not clean_ref:
+        return None
+    product_id_text = clean_ref.split(" - ", 1)[0].strip()
+    if not product_id_text.isdigit():
+        return None
+    component_product_id = int(product_id_text)
+    if component_product_id == parent_product_id:
+        return None
+    return db.scalar(
+        select(Product).where(
+            Product.company_id == company_id,
+            Product.id == component_product_id,
+        )
+    )
 
 
 def draw_box(canvas, x, y, w, h, title, value=""):
@@ -1868,11 +1904,17 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             select(Product)
             .where(Product.company_id == company.id)
             .options(
-                selectinload(Product.technical_items),
+                selectinload(Product.group),
+                selectinload(Product.technical_items).selectinload(ProductTechnicalItem.component_product),
                 selectinload(Product.cost_items),
             )
             .order_by(Product.created_at.desc())
         ).all()
+        if needs_products
+        else []
+    )
+    product_groups = (
+        db.scalars(select(ProductGroup).where(ProductGroup.company_id == company.id).order_by(ProductGroup.name.asc())).all()
         if needs_products
         else []
     )
@@ -2089,6 +2131,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
             "customers": customers,
             "suppliers": suppliers,
             "products": products,
+            "product_groups": product_groups,
             "product_rows": product_rows,
             "stock_summary": {
                 "products": len(products),
@@ -2587,6 +2630,7 @@ def create_supplier(
 @app.post("/stock/products")
 async def create_stock_product(
     request: Request,
+    group_name: str = Form(""),
     sku: str = Form(""),
     description: str = Form(...),
     brand: str = Form(""),
@@ -2603,8 +2647,10 @@ async def create_stock_product(
     if isinstance(context, RedirectResponse):
         return context
     _user, company = context
+    group = get_or_create_product_group(db, company.id, group_name)
     product = Product(
         company_id=company.id,
+        group_id=group.id if group else None,
         sku=sku.strip(),
         description=description.strip(),
         brand=brand.strip(),
@@ -2630,6 +2676,7 @@ async def create_stock_product(
 async def update_stock_product(
     request: Request,
     product_id: int,
+    group_name: str = Form(""),
     sku: str = Form(""),
     description: str = Form(...),
     brand: str = Form(""),
@@ -2649,6 +2696,8 @@ async def update_stock_product(
     product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
     if not product:
         return RedirectResponse("/?tab=estoque", status_code=303)
+    group = get_or_create_product_group(db, company.id, group_name)
+    product.group_id = group.id if group else None
     product.sku = sku.strip()
     product.description = description.strip()
     product.brand = brand.strip()
@@ -2668,6 +2717,24 @@ async def update_stock_product(
     return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
 
 
+@app.post("/stock/groups")
+def create_product_group(
+    request: Request,
+    name: str = Form(...),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    group = get_or_create_product_group(db, company.id, name)
+    if group:
+        group.notes = notes.strip()
+    db.commit()
+    return RedirectResponse("/?tab=estoque", status_code=303)
+
+
 @app.get("/stock/products/{product_id}/image")
 def stock_product_image(request: Request, product_id: int, db: Session = Depends(get_db)):
     context = require_context(request, db)
@@ -2684,7 +2751,8 @@ def stock_product_image(request: Request, product_id: int, db: Session = Depends
 def create_product_technical_item(
     request: Request,
     product_id: int,
-    component: str = Form(...),
+    component_product_ref: str = Form(""),
+    component: str = Form(""),
     quantity: float = Form(0),
     unit: str = Form(""),
     loss_percent: float = Form(0),
@@ -2698,13 +2766,20 @@ def create_product_technical_item(
     product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
     if not product:
         return RedirectResponse("/?tab=estoque", status_code=303)
+    component_product = resolve_component_product(db, company.id, component_product_ref, product.id)
+    component_description = component.strip()
+    if component_product:
+        component_description = component_product.description
+    if not component_description:
+        return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
     db.add(
         ProductTechnicalItem(
             company_id=company.id,
             product_id=product.id,
-            component=component.strip(),
+            component_product_id=component_product.id if component_product else None,
+            component=component_description,
             quantity=quantity or 0,
-            unit=unit.strip().upper(),
+            unit=(unit.strip() or (component_product.unit if component_product else "")).upper(),
             loss_percent=loss_percent or 0,
             notes=notes.strip(),
         )
@@ -2717,7 +2792,8 @@ def create_product_technical_item(
 def update_product_technical_item(
     request: Request,
     item_id: int,
-    component: str = Form(...),
+    component_product_ref: str = Form(""),
+    component: str = Form(""),
     quantity: float = Form(0),
     unit: str = Form(""),
     loss_percent: float = Form(0),
@@ -2731,9 +2807,14 @@ def update_product_technical_item(
     item = db.scalar(select(ProductTechnicalItem).where(ProductTechnicalItem.company_id == company.id, ProductTechnicalItem.id == item_id))
     if not item:
         return RedirectResponse("/?tab=estoque", status_code=303)
-    item.component = component.strip()
+    component_product = resolve_component_product(db, company.id, component_product_ref, item.product_id)
+    component_description = component_product.description if component_product else component.strip()
+    if not component_description:
+        return RedirectResponse(f"/?tab=estoque&produto={item.product_id}", status_code=303)
+    item.component_product_id = component_product.id if component_product else None
+    item.component = component_description
     item.quantity = quantity or 0
-    item.unit = unit.strip().upper()
+    item.unit = (unit.strip() or (component_product.unit if component_product else "")).upper()
     item.loss_percent = loss_percent or 0
     item.notes = notes.strip()
     db.commit()
@@ -2744,8 +2825,9 @@ def update_product_technical_item(
 def create_product_cost_item(
     request: Request,
     product_id: int,
+    cost_product_ref: str = Form(""),
     cost_type: str = Form("Materia prima"),
-    description: str = Form(...),
+    description: str = Form(""),
     value: float = Form(0),
     notes: str = Form(""),
     db: Session = Depends(get_db),
@@ -2757,13 +2839,20 @@ def create_product_cost_item(
     product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
     if not product:
         return RedirectResponse("/?tab=estoque", status_code=303)
+    cost_product = resolve_component_product(db, company.id, cost_product_ref, product.id)
+    cost_description = cost_product.description if cost_product else description.strip()
+    cost_value = value or 0
+    if cost_product and not cost_value:
+        cost_value = cost_product.cost_value or cost_product.sale_value or 0
+    if not cost_description:
+        return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
     db.add(
         ProductCostItem(
             company_id=company.id,
             product_id=product.id,
             cost_type=cost_type.strip(),
-            description=description.strip(),
-            value=value or 0,
+            description=cost_description,
+            value=cost_value,
             notes=notes.strip(),
         )
     )
@@ -2775,8 +2864,9 @@ def create_product_cost_item(
 def update_product_cost_item(
     request: Request,
     item_id: int,
+    cost_product_ref: str = Form(""),
     cost_type: str = Form("Materia prima"),
-    description: str = Form(...),
+    description: str = Form(""),
     value: float = Form(0),
     notes: str = Form(""),
     db: Session = Depends(get_db),
@@ -2788,9 +2878,16 @@ def update_product_cost_item(
     item = db.scalar(select(ProductCostItem).where(ProductCostItem.company_id == company.id, ProductCostItem.id == item_id))
     if not item:
         return RedirectResponse("/?tab=estoque", status_code=303)
+    cost_product = resolve_component_product(db, company.id, cost_product_ref, item.product_id)
+    cost_description = cost_product.description if cost_product else description.strip()
+    cost_value = value or 0
+    if cost_product and not cost_value:
+        cost_value = cost_product.cost_value or cost_product.sale_value or 0
+    if not cost_description:
+        return RedirectResponse(f"/?tab=estoque&produto={item.product_id}", status_code=303)
     item.cost_type = cost_type.strip()
-    item.description = description.strip()
-    item.value = value or 0
+    item.description = cost_description
+    item.value = cost_value
     item.notes = notes.strip()
     db.commit()
     return RedirectResponse(f"/?tab=estoque&produto={item.product_id}", status_code=303)

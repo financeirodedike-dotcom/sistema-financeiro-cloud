@@ -90,6 +90,24 @@ def ensure_lightweight_migrations():
                 if name not in existing_columns:
                     connection.execute(text(f"ALTER TABLE anticipations ADD COLUMN {name} {ddl}"))
 
+        if "products" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("products")}
+            new_columns = {
+                "group_id": "INTEGER",
+            }
+            for name, ddl in new_columns.items():
+                if name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE products ADD COLUMN {name} {ddl}"))
+
+        if "product_technical_items" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("product_technical_items")}
+            new_columns = {
+                "component_product_id": "INTEGER",
+            }
+            for name, ddl in new_columns.items():
+                if name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE product_technical_items ADD COLUMN {name} {ddl}"))
+
         index_statements = [
             ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_date_id ON transactions (company_id, date DESC, id DESC)"),
             ("transactions", "CREATE INDEX IF NOT EXISTS idx_transactions_company_bank_date ON transactions (company_id, bank, date DESC)"),
@@ -104,6 +122,9 @@ def ensure_lightweight_migrations():
             ("debt_payments", "CREATE INDEX IF NOT EXISTS idx_debt_payments_debt_date ON debt_payments (debt_id, payment_date)"),
             ("anticipations", "CREATE INDEX IF NOT EXISTS idx_anticipations_company_created ON anticipations (company_id, created_at DESC)"),
             ("fiscal_documents", "CREATE INDEX IF NOT EXISTS idx_fiscal_documents_company_created ON fiscal_documents (company_id, created_at DESC)"),
+            ("product_groups", "CREATE INDEX IF NOT EXISTS idx_product_groups_company_name ON product_groups (company_id, name)"),
+            ("products", "CREATE INDEX IF NOT EXISTS idx_products_company_group ON products (company_id, group_id)"),
+            ("product_technical_items", "CREATE INDEX IF NOT EXISTS idx_product_technical_items_component_product ON product_technical_items (component_product_id)"),
         ]
         for table_name, statement in index_statements:
             if table_name in table_names:

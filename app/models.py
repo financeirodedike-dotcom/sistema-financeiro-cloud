@@ -264,11 +264,25 @@ class Supplier(Base):
     company: Mapped[Company] = relationship()
 
 
+class ProductGroup(Base):
+    __tablename__ = "product_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship()
+    products: Mapped[list["Product"]] = relationship(back_populates="group")
+
+
 class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("product_groups.id"), nullable=True, index=True)
     sku: Mapped[str] = mapped_column(String(80), default="")
     description: Mapped[str] = mapped_column(String(220), index=True)
     brand: Mapped[str] = mapped_column(String(120), default="")
@@ -284,8 +298,10 @@ class Product(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
+    group: Mapped[ProductGroup | None] = relationship(back_populates="products")
     technical_items: Mapped[list["ProductTechnicalItem"]] = relationship(
         back_populates="product",
+        foreign_keys="ProductTechnicalItem.product_id",
         cascade="all, delete-orphan",
         order_by="ProductTechnicalItem.created_at.desc()",
     )
@@ -302,6 +318,7 @@ class ProductTechnicalItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    component_product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
     component: Mapped[str] = mapped_column(String(180))
     quantity: Mapped[float] = mapped_column(Float, default=0)
     unit: Mapped[str] = mapped_column(String(40), default="")
@@ -310,7 +327,8 @@ class ProductTechnicalItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
-    product: Mapped[Product] = relationship(back_populates="technical_items")
+    product: Mapped[Product] = relationship(back_populates="technical_items", foreign_keys=[product_id])
+    component_product: Mapped[Product | None] = relationship(foreign_keys=[component_product_id])
 
 
 class ProductCostItem(Base):
