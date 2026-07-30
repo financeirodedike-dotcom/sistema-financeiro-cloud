@@ -312,6 +312,9 @@
     button:active { transform: translateY(0); }
     .logout button { background: #ffffff; color: var(--blue); border: 0; box-shadow: none; }
     form { display: flex; flex-wrap: wrap; gap: 9px; align-items: end; }
+    .field-stack { display: grid; gap: 5px; min-width: 180px; flex: 1 1 180px; }
+    .field-stack span { font-size: 11px; font-weight: 900; color: var(--blue); text-transform: uppercase; letter-spacing: .03em; }
+    .field-stack input, .field-stack select, .field-stack textarea { width: 100%; }
     .negative { color: var(--red); font-weight: 800; }
     .positive { color: var(--green); font-weight: 800; }
     .muted { color: var(--muted); }
@@ -2398,22 +2401,52 @@
               <div class="tech-section" id="editar-produto-{{ product.id }}">
                 <h3>Editar produto cadastrado</h3>
                 <form action="/stock/products/{{ product.id }}/edit" method="post" enctype="multipart/form-data">
-                  <input name="sku" value="{{ product.sku or '' }}" placeholder="Codigo/SKU">
-                  <input name="description" value="{{ product.description }}" placeholder="Descricao do produto" required>
-                  <input name="brand" value="{{ product.brand or '' }}" placeholder="Marca">
-                  <input name="unit" value="{{ product.unit or '' }}" placeholder="Unidade">
-                  <input name="ncm" value="{{ product.ncm or '' }}" placeholder="NCM">
-                  <input type="number" step="0.01" name="cost_value" value="{{ product.cost_value or 0 }}" placeholder="Valor de custo">
-                  <input type="number" step="0.01" name="sale_value" value="{{ product.sale_value or 0 }}" placeholder="Valor de venda">
-                  <select name="use_type">
-                    <option value="" {% if not product.use_type %}selected{% endif %}>Tipo de uso</option>
-                    <option value="Venda" {% if product.use_type == "Venda" %}selected{% endif %}>Venda</option>
-                    <option value="Producao" {% if product.use_type == "Producao" %}selected{% endif %}>Producao</option>
-                    <option value="Consumo interno" {% if product.use_type == "Consumo interno" %}selected{% endif %}>Consumo interno</option>
-                    <option value="Servico" {% if product.use_type == "Servico" %}selected{% endif %}>Servico</option>
-                  </select>
-                  <input type="file" name="image" accept="image/*">
-                  <input name="notes" value="{{ product.notes or '' }}" placeholder="Observacoes">
+                  <label class="field-stack">
+                    <span>Codigo/SKU</span>
+                    <input name="sku" value="{{ product.sku or '' }}" placeholder="Codigo/SKU">
+                  </label>
+                  <label class="field-stack">
+                    <span>Descricao do produto</span>
+                    <input name="description" value="{{ product.description }}" placeholder="Descricao do produto" required>
+                  </label>
+                  <label class="field-stack">
+                    <span>Marca</span>
+                    <input name="brand" value="{{ product.brand or '' }}" placeholder="Marca">
+                  </label>
+                  <label class="field-stack">
+                    <span>Unidade</span>
+                    <input name="unit" value="{{ product.unit or '' }}" placeholder="Unidade">
+                  </label>
+                  <label class="field-stack">
+                    <span>NCM</span>
+                    <input name="ncm" value="{{ product.ncm or '' }}" placeholder="NCM">
+                  </label>
+                  <label class="field-stack">
+                    <span>Valor de custo</span>
+                    <input type="number" step="0.01" name="cost_value" value="{{ product.cost_value or 0 }}" placeholder="Valor de custo">
+                  </label>
+                  <label class="field-stack">
+                    <span>Valor de venda</span>
+                    <input type="number" step="0.01" name="sale_value" value="{{ product.sale_value or 0 }}" placeholder="Valor de venda">
+                  </label>
+                  <label class="field-stack">
+                    <span>Tipo de uso</span>
+                    <select name="use_type">
+                      <option value="" {% if not product.use_type %}selected{% endif %}>Tipo de uso</option>
+                      <option value="Venda" {% if product.use_type == "Venda" %}selected{% endif %}>Venda</option>
+                      <option value="Producao" {% if product.use_type == "Producao" %}selected{% endif %}>Producao</option>
+                      <option value="Consumo interno" {% if product.use_type == "Consumo interno" %}selected{% endif %}>Consumo interno</option>
+                      <option value="Servico" {% if product.use_type == "Servico" %}selected{% endif %}>Servico</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>Imagem do produto</span>
+                    <input type="file" name="image" accept="image/*">
+                  </label>
+                  <label class="field-stack">
+                    <span>Observacoes</span>
+                    <input name="notes" value="{{ product.notes or '' }}" placeholder="Observacoes">
+                  </label>
                   <button type="submit">Salvar alteracoes</button>
                 </form>
               </div>
