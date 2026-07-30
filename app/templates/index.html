@@ -831,8 +831,11 @@
             <input name="email" type="email" placeholder="E-mail">
             <input name="city" placeholder="Cidade">
             <input name="state" placeholder="UF">
-            <input name="category" placeholder="Categoria">
-            <input name="payment_terms" placeholder="Condicao de pagamento">
+            <select name="category">
+              <option value="Fornecedor">Fornecedor</option>
+              <option value="Transportadora">Transportadora</option>
+              <option value="Colaborador">Colaborador</option>
+            </select>
             <select name="status">
               <option value="Ativo">Ativo</option>
               <option value="Bloqueado">Bloqueado</option>
@@ -870,7 +873,7 @@
           <h2>Fornecedores cadastrados</h2>
           <div class="scroll">
             <table>
-              <thead><tr><th>Nome</th><th>Documento</th><th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Categoria</th><th>Pagamento</th><th>Status</th></tr></thead>
+              <thead><tr><th>Nome</th><th>Documento</th><th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Tipo</th><th>Status</th></tr></thead>
               <tbody>
                 {% for supplier in suppliers %}
                 <tr>
@@ -880,7 +883,6 @@
                   <td>{{ supplier.email }}</td>
                   <td>{{ supplier.city }}{% if supplier.state %}/{{ supplier.state }}{% endif %}</td>
                   <td>{{ supplier.category }}</td>
-                  <td>{{ supplier.payment_terms }}</td>
                   <td class="{{ 'positive' if supplier.status == 'Ativo' else 'muted' }}">{{ supplier.status }}</td>
                 </tr>
                 {% endfor %}
@@ -1326,8 +1328,11 @@
           <input name="document" placeholder="CPF/CNPJ">
           <input name="phone" placeholder="Telefone">
           <input name="email" type="email" placeholder="E-mail">
-          <input name="category" placeholder="Categoria">
-          <input name="payment_terms" placeholder="Condicao de pagamento">
+          <select name="category">
+            <option value="Fornecedor">Fornecedor</option>
+            <option value="Transportadora">Transportadora</option>
+            <option value="Colaborador">Colaborador</option>
+          </select>
           <button type="submit">Salvar fornecedor</button>
           <a class="pill" href="/?tab=cadastros">Ver todos os cadastros</a>
         </form>
@@ -1393,8 +1398,11 @@
               <input name="email" type="email" placeholder="E-mail">
               <input name="city" placeholder="Cidade">
               <input name="state" placeholder="UF">
-              <input name="category" placeholder="Categoria">
-              <input name="payment_terms" placeholder="Condicao de pagamento">
+              <select name="category">
+                <option value="Fornecedor">Fornecedor</option>
+                <option value="Transportadora">Transportadora</option>
+                <option value="Colaborador">Colaborador</option>
+              </select>
               <select name="status">
                 <option value="Ativo">Ativo</option>
                 <option value="Bloqueado">Bloqueado</option>
