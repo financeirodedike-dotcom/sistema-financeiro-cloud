@@ -2610,6 +2610,7 @@ def create_supplier(
     payment_terms: str = Form(""),
     status: str = Form("Ativo"),
     notes: str = Form(""),
+    return_tab: str = Form("cadastros"),
     db: Session = Depends(get_db),
 ):
     context = require_context(request, db)
@@ -2636,7 +2637,8 @@ def create_supplier(
     supplier.status = status if status in {"Ativo", "Inativo", "Bloqueado"} else "Ativo"
     supplier.notes = notes.strip()
     db.commit()
-    return RedirectResponse("/?tab=cadastros", status_code=303)
+    target_tab = return_tab if return_tab in {"cadastros", "contas-pagar"} else "cadastros"
+    return RedirectResponse(f"/?tab={target_tab}", status_code=303)
 
 
 @app.post("/stock/products")

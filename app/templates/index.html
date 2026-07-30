@@ -1383,6 +1383,27 @@
             <button type="submit">Salvar titulo</button>
           </form>
           <p class="muted">Ao informar mais de uma parcela, o sistema divide o valor total e cria vencimentos mensais automaticamente.</p>
+          <details class="inline-edit">
+            <summary>Cadastrar fornecedor</summary>
+            <form action="/suppliers" method="post">
+              <input type="hidden" name="return_tab" value="contas-pagar">
+              <input name="name" placeholder="Nome/Razao social" required>
+              <input name="document" placeholder="CPF/CNPJ">
+              <input name="phone" placeholder="Telefone">
+              <input name="email" type="email" placeholder="E-mail">
+              <input name="city" placeholder="Cidade">
+              <input name="state" placeholder="UF">
+              <input name="category" placeholder="Categoria">
+              <input name="payment_terms" placeholder="Condicao de pagamento">
+              <select name="status">
+                <option value="Ativo">Ativo</option>
+                <option value="Bloqueado">Bloqueado</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+              <input name="notes" placeholder="Observacoes">
+              <button type="submit">Salvar fornecedor</button>
+            </form>
+          </details>
         </div>
         <div class="panel">
           <h2>Compromissos financeiros</h2>
