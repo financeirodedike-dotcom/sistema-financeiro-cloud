@@ -1361,23 +1361,44 @@
       <div class="two">
         <div class="panel">
           <h2>Novo titulo a pagar</h2>
-          <form action="/" method="get">
-            <input type="hidden" name="tab" value="contas-pagar">
-            <input type="text" inputmode="numeric" name="due_date" placeholder="dd/mm/aaaa">
-            <input name="supplier" placeholder="Fornecedor">
+          <datalist id="supplier-options">
+            {% for supplier in suppliers %}
+            <option value="{{ supplier.name }}"></option>
+            {% endfor %}
+          </datalist>
+          <form action="/payables" method="post">
+            <input name="supplier" list="supplier-options" placeholder="Fornecedor" required>
+            <input name="document_number" placeholder="Documento">
+            <select name="account_id">
+              <option value="">Conta financeira</option>
+              {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" inputmode="numeric" name="due_date" placeholder="Vencimento dd/mm/aaaa">
             <input name="description" placeholder="Descricao">
-            <input type="number" step="0.01" name="amount" placeholder="Valor">
-            <button type="submit">Preparar cadastro</button>
+            <input type="number" step="0.01" name="total_value" placeholder="Valor total">
+            <input type="number" min="1" max="120" name="installment_count" value="1" placeholder="Quantidade de parcelas">
+            <input name="notes" placeholder="Observacoes">
+            <button type="submit">Salvar titulo</button>
           </form>
-          <p class="muted">Nesta fase o cadastro prepara a tela. A persistencia completa sera ligada ao banco na proxima evolucao.</p>
+          <p class="muted">Ao informar mais de uma parcela, o sistema divide o valor total e cria vencimentos mensais automaticamente.</p>
         </div>
         <div class="panel">
           <h2>Compromissos financeiros</h2>
           <table>
-            <thead><tr><th>Credor</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
+            <thead><tr><th>Fornecedor</th><th>Documento</th><th>Conta financeira</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
             <tbody>
               {% for debt in debts %}
-              <tr><td>{{ debt.creditor }}</td><td>{{ debt.due_date|date_br }}</td><td>{{ debt.capital_value|brl }}</td><td>{{ debt.status }}</td></tr>
+              <tr>
+                <td>{{ debt.creditor }}</td>
+                <td>{{ debt.document_number or "-" }}</td>
+                <td>{{ debt.account.name if debt.account else "-" }}</td>
+                <td>{{ "%02d"|format(debt.installment_number or 1) }}/{{ "%02d"|format(debt.installment_count or 1) }}</td>
+                <td>{{ debt.due_date|date_br }}</td>
+                <td>{{ debt.capital_value|brl }}</td>
+                <td>{{ debt.status }}</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>

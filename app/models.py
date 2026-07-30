@@ -406,6 +406,10 @@ class Debt(Base):
     debt_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     creditor: Mapped[str] = mapped_column(String(160), index=True)
     creditor_type: Mapped[str] = mapped_column(String(60), default="Banco")
+    document_number: Mapped[str] = mapped_column(String(120), default="")
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("financial_accounts.id"), nullable=True)
+    installment_number: Mapped[int] = mapped_column(Integer, default=1)
+    installment_count: Mapped[int] = mapped_column(Integer, default=1)
     description: Mapped[str] = mapped_column(String(240), default="")
     capital_value: Mapped[float] = mapped_column(Float, default=0)
     monthly_interest_rate: Mapped[float] = mapped_column(Float, default=0)
@@ -418,6 +422,7 @@ class Debt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     company: Mapped[Company] = relationship()
+    account: Mapped[FinancialAccount | None] = relationship()
     payments: Mapped[list["DebtPayment"]] = relationship(
         back_populates="debt",
         cascade="all, delete-orphan",

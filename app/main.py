@@ -1,4 +1,5 @@
 import hashlib
+from calendar import monthrange
 from io import BytesIO
 import re
 import unicodedata
@@ -717,6 +718,14 @@ def format_month_br(value: str | None) -> str:
 
 templates.env.filters["date_br"] = format_date_br
 templates.env.filters["month_br"] = format_month_br
+
+
+def add_months(value: date, months: int = 1) -> date:
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return date(year, month, day)
 
 
 ADMIN_ROLES = {"owner", "admin"}
@@ -1776,7 +1785,7 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
     }
     needs_reports = active_tab in report_tabs
     needs_transactions = active_tab in {"extratos", "contabilizados", "contas-receber"}
-    needs_registry = active_tab in {"dashboard", "cadastros", "compras", "vendas"}
+    needs_registry = active_tab in {"dashboard", "cadastros", "compras", "vendas", "contas-pagar"}
     needs_products = active_tab in {"dashboard", "vendas", "estoque", "producao"}
     needs_receivables = active_tab in {"dashboard", "contas-receber", "antecipacoes", "mapa"}
     needs_debts = active_tab in {"dashboard", "endividamento", "contas-pagar", "balanco", "mapa"}
@@ -1964,7 +1973,10 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         db.scalars(
             select(Debt)
             .where(Debt.company_id == company.id)
-            .options(selectinload(Debt.payments).selectinload(DebtPayment.transaction))
+            .options(
+                selectinload(Debt.account),
+                selectinload(Debt.payments).selectinload(DebtPayment.transaction),
+            )
             .order_by(Debt.created_at.desc())
         ).all()
         if needs_debts
@@ -3102,6 +3114,67 @@ def create_debt(
     )
     db.commit()
     return RedirectResponse("/?tab=endividamento", status_code=303)
+
+
+@app.post("/payables")
+def create_payable(
+    request: Request,
+    supplier: str = Form(...),
+    document_number: str = Form(""),
+    account_id: str = Form(""),
+    due_date: str = Form(""),
+    description: str = Form(""),
+    total_value: float = Form(0),
+    installment_count: int = Form(1),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    parsed_due_date = parse_filter_date(due_date) or date.today()
+    clean_supplier = supplier.strip()
+    clean_document = document_number.strip()
+    installments = max(1, min(installment_count or 1, 120))
+    installment_value = (total_value or 0) / installments if installments else (total_value or 0)
+    selected_account_id = None
+    if account_id:
+        try:
+            account = db.scalar(
+                select(FinancialAccount).where(
+                    FinancialAccount.company_id == company.id,
+                    FinancialAccount.id == int(account_id),
+                )
+            )
+            selected_account_id = account.id if account else None
+        except ValueError:
+            selected_account_id = None
+
+    for installment_number in range(1, installments + 1):
+        installment_due_date = add_months(parsed_due_date, installment_number - 1)
+        db.add(
+            Debt(
+                company_id=company.id,
+                debt_date=date.today(),
+                due_date=installment_due_date,
+                creditor=clean_supplier,
+                creditor_type="Fornecedor",
+                document_number=clean_document,
+                account_id=selected_account_id,
+                installment_number=installment_number,
+                installment_count=installments,
+                description=description.strip(),
+                capital_value=installment_value,
+                monthly_interest_rate=0,
+                interest_type="Simples",
+                installment_value=installment_value,
+                due_day=installment_due_date.day,
+                notes=notes.strip(),
+            )
+        )
+    db.commit()
+    return RedirectResponse("/?tab=contas-pagar", status_code=303)
 
 
 @app.post("/debts/{debt_id}/update")
