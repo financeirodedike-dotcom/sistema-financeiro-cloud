@@ -2626,6 +2626,48 @@ async def create_stock_product(
     return RedirectResponse("/?tab=estoque", status_code=303)
 
 
+@app.post("/stock/products/{product_id}/edit")
+async def update_stock_product(
+    request: Request,
+    product_id: int,
+    sku: str = Form(""),
+    description: str = Form(...),
+    brand: str = Form(""),
+    unit: str = Form(""),
+    ncm: str = Form(""),
+    cost_value: float = Form(0),
+    sale_value: float = Form(0),
+    use_type: str = Form(""),
+    notes: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    product = db.scalar(select(Product).where(Product.company_id == company.id, Product.id == product_id))
+    if not product:
+        return RedirectResponse("/?tab=estoque", status_code=303)
+    product.sku = sku.strip()
+    product.description = description.strip()
+    product.brand = brand.strip()
+    product.unit = unit.strip().upper()
+    product.ncm = ncm.strip()
+    product.cost_value = cost_value or 0
+    product.sale_value = sale_value or 0
+    product.use_type = use_type.strip()
+    product.notes = notes.strip()
+    if image and image.filename:
+        image_bytes = await image.read()
+        if image_bytes:
+            product.image_filename = image.filename
+            product.image_content_type = image.content_type or "application/octet-stream"
+            product.image_data = image_bytes
+    db.commit()
+    return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
+
+
 @app.get("/stock/products/{product_id}/image")
 def stock_product_image(request: Request, product_id: int, db: Session = Depends(get_db)):
     context = require_context(request, db)
@@ -2671,6 +2713,33 @@ def create_product_technical_item(
     return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
 
 
+@app.post("/stock/technical-items/{item_id}/edit")
+def update_product_technical_item(
+    request: Request,
+    item_id: int,
+    component: str = Form(...),
+    quantity: float = Form(0),
+    unit: str = Form(""),
+    loss_percent: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    item = db.scalar(select(ProductTechnicalItem).where(ProductTechnicalItem.company_id == company.id, ProductTechnicalItem.id == item_id))
+    if not item:
+        return RedirectResponse("/?tab=estoque", status_code=303)
+    item.component = component.strip()
+    item.quantity = quantity or 0
+    item.unit = unit.strip().upper()
+    item.loss_percent = loss_percent or 0
+    item.notes = notes.strip()
+    db.commit()
+    return RedirectResponse(f"/?tab=estoque&produto={item.product_id}", status_code=303)
+
+
 @app.post("/stock/products/{product_id}/cost-items")
 def create_product_cost_item(
     request: Request,
@@ -2700,6 +2769,31 @@ def create_product_cost_item(
     )
     db.commit()
     return RedirectResponse(f"/?tab=estoque&produto={product.id}", status_code=303)
+
+
+@app.post("/stock/cost-items/{item_id}/edit")
+def update_product_cost_item(
+    request: Request,
+    item_id: int,
+    cost_type: str = Form("Materia prima"),
+    description: str = Form(...),
+    value: float = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    context = require_context(request, db)
+    if isinstance(context, RedirectResponse):
+        return context
+    _user, company = context
+    item = db.scalar(select(ProductCostItem).where(ProductCostItem.company_id == company.id, ProductCostItem.id == item_id))
+    if not item:
+        return RedirectResponse("/?tab=estoque", status_code=303)
+    item.cost_type = cost_type.strip()
+    item.description = description.strip()
+    item.value = value or 0
+    item.notes = notes.strip()
+    db.commit()
+    return RedirectResponse(f"/?tab=estoque&produto={item.product_id}", status_code=303)
 
 
 @app.post("/receivables")

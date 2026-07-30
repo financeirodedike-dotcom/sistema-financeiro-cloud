@@ -365,6 +365,9 @@
     .tech-subtabs span.active { background: var(--blue); color: #fff; }
     .tech-section { padding: 12px; border-top: 1px solid #fff; }
     .tech-section h3 { margin: 0 0 10px; color: var(--blue); font-size: 15px; }
+    .inline-edit { margin: 8px 0; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); background: #fff; }
+    .inline-edit summary { cursor: pointer; font-weight: 900; color: var(--blue); }
+    .inline-edit form { margin-top: 10px; }
     @media (max-width: 1100px) { .tech-body { grid-template-columns: 1fr; } .tech-form-grid { grid-template-columns: 1fr; } .tech-form-grid label { text-align: left; } }
     .hero360 a.pillar { display: block; color: white; text-decoration: none; transition: transform .15s ease, background .15s ease; }
     .hero360 a.pillar:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
@@ -2376,6 +2379,7 @@
                   <button type="button">Processar</button>
                   <button type="button">Consultar Preco</button>
                   <button type="button">Atualizar Requisicoes</button>
+                  <a class="pill" href="#editar-produto-{{ product.id }}">Editar ficha</a>
                   <a class="pill" href="/stock/products/{{ product.id }}/image" target="_blank">Imagem</a>
                   <button type="button" onclick="window.print()">Imprimir ficha</button>
                 </div>
@@ -2389,6 +2393,29 @@
                 <span>Custos - Ficha</span>
                 <span>Imagem</span>
                 <span>Avaliacao Tecnica de Composicao</span>
+              </div>
+
+              <div class="tech-section" id="editar-produto-{{ product.id }}">
+                <h3>Editar produto cadastrado</h3>
+                <form action="/stock/products/{{ product.id }}/edit" method="post" enctype="multipart/form-data">
+                  <input name="sku" value="{{ product.sku or '' }}" placeholder="Codigo/SKU">
+                  <input name="description" value="{{ product.description }}" placeholder="Descricao do produto" required>
+                  <input name="brand" value="{{ product.brand or '' }}" placeholder="Marca">
+                  <input name="unit" value="{{ product.unit or '' }}" placeholder="Unidade">
+                  <input name="ncm" value="{{ product.ncm or '' }}" placeholder="NCM">
+                  <input type="number" step="0.01" name="cost_value" value="{{ product.cost_value or 0 }}" placeholder="Valor de custo">
+                  <input type="number" step="0.01" name="sale_value" value="{{ product.sale_value or 0 }}" placeholder="Valor de venda">
+                  <select name="use_type">
+                    <option value="" {% if not product.use_type %}selected{% endif %}>Tipo de uso</option>
+                    <option value="Venda" {% if product.use_type == "Venda" %}selected{% endif %}>Venda</option>
+                    <option value="Producao" {% if product.use_type == "Producao" %}selected{% endif %}>Producao</option>
+                    <option value="Consumo interno" {% if product.use_type == "Consumo interno" %}selected{% endif %}>Consumo interno</option>
+                    <option value="Servico" {% if product.use_type == "Servico" %}selected{% endif %}>Servico</option>
+                  </select>
+                  <input type="file" name="image" accept="image/*">
+                  <input name="notes" value="{{ product.notes or '' }}" placeholder="Observacoes">
+                  <button type="submit">Salvar alteracoes</button>
+                </form>
               </div>
 
               <div class="tech-section">
@@ -2413,6 +2440,21 @@
                       <td>{{ item.loss_percent }}%</td>
                       <td>-</td>
                       <td>{{ item.notes }}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="7">
+                        <details class="inline-edit">
+                          <summary>Editar material da ficha tecnica</summary>
+                          <form action="/stock/technical-items/{{ item.id }}/edit" method="post">
+                            <input name="component" value="{{ item.component }}" placeholder="Componente / materia prima" required>
+                            <input type="number" step="0.0001" name="quantity" value="{{ item.quantity or 0 }}" placeholder="Quantidade">
+                            <input name="unit" value="{{ item.unit or '' }}" placeholder="Unidade">
+                            <input type="number" step="0.01" name="loss_percent" value="{{ item.loss_percent or 0 }}" placeholder="% perda">
+                            <input name="notes" value="{{ item.notes or '' }}" placeholder="Observacoes">
+                            <button type="submit">Salvar material</button>
+                          </form>
+                        </details>
+                      </td>
                     </tr>
                     {% else %}
                     <tr><td colspan="7" class="muted" style="text-align:center;">Nao ha dados para mostrar</td></tr>
@@ -2443,6 +2485,24 @@
                   <tbody>
                     {% for item in product.cost_items %}
                     <tr><td>{{ item.cost_type }}</td><td>{{ item.description }}</td><td>-</td><td>{{ item.value|brl }}</td><td>{{ item.value|brl }}</td><td>{{ item.notes }}</td></tr>
+                    <tr>
+                      <td colspan="6">
+                        <details class="inline-edit">
+                          <summary>Editar custo da ficha</summary>
+                          <form action="/stock/cost-items/{{ item.id }}/edit" method="post">
+                            <select name="cost_type">
+                              {% for option in ["Materia prima", "Impostos", "Frete", "Mao de obra", "Comissao", "Embalagem", "Outros"] %}
+                              <option value="{{ option }}" {% if item.cost_type == option %}selected{% endif %}>{{ option }}</option>
+                              {% endfor %}
+                            </select>
+                            <input name="description" value="{{ item.description }}" placeholder="Descricao do custo" required>
+                            <input type="number" step="0.01" name="value" value="{{ item.value or 0 }}" placeholder="Valor">
+                            <input name="notes" value="{{ item.notes or '' }}" placeholder="Observacoes">
+                            <button type="submit">Salvar custo</button>
+                          </form>
+                        </details>
+                      </td>
+                    </tr>
                     {% else %}
                     <tr><td colspan="6" class="muted" style="text-align:center;">Nao ha dados para mostrar</td></tr>
                     {% endfor %}
