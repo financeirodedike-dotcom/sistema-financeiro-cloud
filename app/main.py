@@ -1880,6 +1880,11 @@ def home_fast(request: Request, db: Session = Depends(get_db)):
         {
             "product": product,
             "technical_count": len(product.technical_items),
+            "average_loss": (
+                sum(item.loss_percent or 0 for item in product.technical_items) / len(product.technical_items)
+                if product.technical_items
+                else 0
+            ),
             "cost_total": sum(item.value or 0 for item in product.cost_items),
             "margin": (product.sale_value or 0) - sum(item.value or 0 for item in product.cost_items),
         }

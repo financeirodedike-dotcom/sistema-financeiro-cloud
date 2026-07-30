@@ -348,6 +348,24 @@
     .product-thumb { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); background: var(--soft-2); }
     .product-card-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
     .product-card-main { display: flex; gap: 12px; align-items: center; min-width: 280px; }
+    .tech-window { margin-top: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: #f8fafc; overflow: hidden; }
+    .tech-titlebar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; background: #e5ebf2; border-bottom: 1px solid var(--line-strong); font-weight: 900; color: var(--blue); }
+    .tech-body { padding: 12px; display: grid; grid-template-columns: 1.25fr 1fr 180px; gap: 12px; align-items: start; }
+    .tech-form-grid { display: grid; grid-template-columns: 120px 1fr; gap: 7px 9px; align-items: center; }
+    .tech-form-grid label { font-size: 12px; font-weight: 800; color: var(--blue); text-align: right; }
+    .tech-readonly { min-height: 33px; padding: 8px 10px; border: 1px solid #b8c6d6; background: #fffde8; border-radius: 4px; font-weight: 800; }
+    .tech-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .tech-metric { border: 1px solid #b8c6d6; background: #ecfdf3; padding: 7px; border-radius: 4px; }
+    .tech-metric strong { display: block; font-size: 11px; color: var(--blue); text-transform: uppercase; }
+    .tech-metric span { display: block; margin-top: 3px; font-weight: 900; text-align: right; }
+    .tech-actions { display: grid; gap: 7px; }
+    .tech-actions .pill, .tech-actions button { width: 100%; justify-content: center; text-align: center; }
+    .tech-subtabs { display: flex; gap: 3px; flex-wrap: wrap; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+    .tech-subtabs span { padding: 6px 10px; border: 1px solid var(--line-strong); border-bottom-color: #9aacbe; background: #fff; border-radius: 5px 5px 0 0; font-size: 12px; font-weight: 800; color: var(--blue); }
+    .tech-subtabs span.active { background: var(--blue); color: #fff; }
+    .tech-section { padding: 12px; border-top: 1px solid #fff; }
+    .tech-section h3 { margin: 0 0 10px; color: var(--blue); font-size: 15px; }
+    @media (max-width: 1100px) { .tech-body { grid-template-columns: 1fr; } .tech-form-grid { grid-template-columns: 1fr; } .tech-form-grid label { text-align: left; } }
     .hero360 a.pillar { display: block; color: white; text-decoration: none; transition: transform .15s ease, background .15s ease; }
     .hero360 a.pillar:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
     .finance-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2328,16 +2346,53 @@
               <span><strong>{{ product.sale_value|brl }}</strong><span>Custo ficha: {{ row.cost_total|brl }} | Margem: {{ row.margin|brl }}</span></span>
             </summary>
 
-            <div class="grid" style="margin-top:12px;">
-              <div class="kpi"><span>Valor de custo</span><strong>{{ product.cost_value|brl }}</strong></div>
-              <div class="kpi"><span>Valor de venda</span><strong>{{ product.sale_value|brl }}</strong></div>
-              <div class="kpi"><span>Ficha de custo</span><strong>{{ row.cost_total|brl }}</strong></div>
-              <div class="kpi"><span>Composicao</span><strong>{{ row.technical_count }}</strong></div>
-            </div>
+            <div class="tech-window">
+              <div class="tech-titlebar">
+                <span>Ficha de Custo e Composicao do Produto</span>
+                <a class="pill" href="/?tab=estoque">Sair</a>
+              </div>
+              <div class="tech-body">
+                <div class="tech-form-grid">
+                  <label>ID / Descricao</label><div class="tech-readonly">{{ product.id }} | {{ product.description }}</div>
+                  <label>Produto</label><div class="tech-readonly">{{ product.sku or "-" }} - {{ product.description }}</div>
+                  <label>Nome comercial</label><div class="tech-readonly">{{ product.brand or product.description }}</div>
+                  <label>Representante</label><div class="tech-readonly">{{ product.use_type or "Nao informado" }}</div>
+                  <label>NCM / Unidade</label><div class="tech-readonly">{{ product.ncm or "-" }} | {{ product.unit or "-" }}</div>
+                  <label>Qtde base</label><div class="tech-readonly">1 | Perda media dos materiais: {{ row.average_loss|round(2) }}%</div>
+                </div>
 
-            <div class="two" style="margin-top:12px;">
-              <div class="panel">
-                <h2>Ficha tecnica</h2>
+                <div>
+                  <div class="tech-metrics">
+                    <div class="tech-metric"><strong>Preco de custo</strong><span>{{ product.cost_value|brl }}</span></div>
+                    <div class="tech-metric"><strong>Custo ficha</strong><span>{{ row.cost_total|brl }}</span></div>
+                    <div class="tech-metric"><strong>Preco de venda</strong><span>{{ product.sale_value|brl }}</span></div>
+                    <div class="tech-metric"><strong>Margem</strong><span class="{{ 'positive' if row.margin >= 0 else 'negative' }}">{{ row.margin|brl }}</span></div>
+                    <div class="tech-metric"><strong>Tipo de custo</strong><span>PRECO MEDIO</span></div>
+                    <div class="tech-metric"><strong>Tipo de calculo</strong><span>% DE LUCRO</span></div>
+                  </div>
+                </div>
+
+                <div class="tech-actions">
+                  <button type="button">Processar</button>
+                  <button type="button">Consultar Preco</button>
+                  <button type="button">Atualizar Requisicoes</button>
+                  <a class="pill" href="/stock/products/{{ product.id }}/image" target="_blank">Imagem</a>
+                  <button type="button" onclick="window.print()">Imprimir ficha</button>
+                </div>
+              </div>
+
+              <div class="tech-subtabs">
+                <span class="active">Ficha de Custo</span>
+                <span>Observacoes</span>
+                <span>Descricao</span>
+                <span>Materiais - Ficha</span>
+                <span>Custos - Ficha</span>
+                <span>Imagem</span>
+                <span>Avaliacao Tecnica de Composicao</span>
+              </div>
+
+              <div class="tech-section">
+                <h3>Materiais - Ficha tecnica</h3>
                 <form action="/stock/products/{{ product.id }}/technical-items" method="post">
                   <input name="component" placeholder="Componente / materia prima" required>
                   <input type="number" step="0.0001" name="quantity" placeholder="Quantidade">
@@ -2347,17 +2402,27 @@
                   <button type="submit">Adicionar composicao</button>
                 </form>
                 <table>
-                  <thead><tr><th>Componente</th><th>Qtd.</th><th>Un.</th><th>Perda</th><th>Obs.</th></tr></thead>
+                  <thead><tr><th>Tipo</th><th>Descricao</th><th>Quantidade</th><th>Unidade</th><th>Percentual</th><th>Valor unitario</th><th>Valor total</th></tr></thead>
                   <tbody>
                     {% for item in product.technical_items %}
-                    <tr><td>{{ item.component }}</td><td>{{ item.quantity }}</td><td>{{ item.unit }}</td><td>{{ item.loss_percent }}%</td><td>{{ item.notes }}</td></tr>
+                    <tr>
+                      <td>Material</td>
+                      <td>{{ item.component }}</td>
+                      <td>{{ item.quantity }}</td>
+                      <td>{{ item.unit }}</td>
+                      <td>{{ item.loss_percent }}%</td>
+                      <td>-</td>
+                      <td>{{ item.notes }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="muted" style="text-align:center;">Nao ha dados para mostrar</td></tr>
                     {% endfor %}
                   </tbody>
                 </table>
               </div>
 
-              <div class="panel">
-                <h2>Ficha de custo</h2>
+              <div class="tech-section">
+                <h3>Custos - Ficha de custo</h3>
                 <form action="/stock/products/{{ product.id }}/cost-items" method="post">
                   <select name="cost_type">
                     <option value="Materia prima">Materia prima</option>
@@ -2374,14 +2439,38 @@
                   <button type="submit">Adicionar custo</button>
                 </form>
                 <table>
-                  <thead><tr><th>Tipo</th><th>Descricao</th><th>Valor</th><th>Obs.</th></tr></thead>
+                  <thead><tr><th>Tipo</th><th>Descricao</th><th>Percentual</th><th>Valor unitario</th><th>Valor total</th><th>Obs.</th></tr></thead>
                   <tbody>
                     {% for item in product.cost_items %}
-                    <tr><td>{{ item.cost_type }}</td><td>{{ item.description }}</td><td>{{ item.value|brl }}</td><td>{{ item.notes }}</td></tr>
+                    <tr><td>{{ item.cost_type }}</td><td>{{ item.description }}</td><td>-</td><td>{{ item.value|brl }}</td><td>{{ item.value|brl }}</td><td>{{ item.notes }}</td></tr>
+                    {% else %}
+                    <tr><td colspan="6" class="muted" style="text-align:center;">Nao ha dados para mostrar</td></tr>
                     {% endfor %}
                   </tbody>
-                  <tfoot><tr><td colspan="2">Total da ficha</td><td>{{ row.cost_total|brl }}</td><td>Margem: {{ row.margin|brl }}</td></tr></tfoot>
+                  <tfoot><tr><td colspan="4">Total da ficha</td><td>{{ row.cost_total|brl }}</td><td>Margem: {{ row.margin|brl }}</td></tr></tfoot>
                 </table>
+              </div>
+
+              <div class="tech-section">
+                <h3>Imagem e avaliacao</h3>
+                <div class="two">
+                  <div>
+                    {% if product.image_data %}
+                    <img src="/stock/products/{{ product.id }}/image" alt="{{ product.description }}" style="max-width:280px; width:100%; border:1px solid var(--line); border-radius:10px;">
+                    {% else %}
+                    <p class="muted">Produto sem imagem anexada.</p>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <table>
+                      <tbody>
+                        <tr><td>Observacoes</td><td>{{ product.notes or "-" }}</td></tr>
+                        <tr><td>Avaliacao tecnica</td><td>{{ "Composicao cadastrada" if row.technical_count else "Aguardando composicao" }}</td></tr>
+                        <tr><td>Status de custo</td><td>{{ "Ficha de custo cadastrada" if row.cost_total else "Aguardando custos" }}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </details>
